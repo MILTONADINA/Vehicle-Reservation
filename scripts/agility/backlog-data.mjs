@@ -67,8 +67,9 @@ export function epicRef(featureNum) {
 
 export function parseUserStories(content) {
   const stories = [];
+  // Allow a blank line after the heading (standard markdown in feature specs).
   const storyRegex =
-    /### US-\d+\.(\d+): ([^\n]+)\n\*\*As (?:a|the)\*\* ([^\n]+)\n\*\*I want(?: to)?\*\* ([^\n]+)\n\*\*So that\*\* ([^\n]+)/g;
+    /### US-\d+\.(\d+):\s*([^\n]+)\r?\n+\*\*As (?:a|the)\*\*\s*([^\n]+)\r?\n\*\*I want(?: to)?\*\*\s*([^\n]+)\r?\n\*\*So that\*\*\s*([^\n]+)/g;
 
   let match;
   while ((match = storyRegex.exec(content)) !== null) {
@@ -99,7 +100,11 @@ export function parseScenarios(content) {
   for (const line of lines) {
     if (line.startsWith("### ") && !line.startsWith("#### ")) {
       const heading = line.slice(4).trim();
-      if (!heading.startsWith("US-") && !heading.startsWith("`") && !heading.startsWith("[")) {
+      if (
+        !heading.startsWith("US-") &&
+        !heading.startsWith("`") &&
+        !heading.startsWith("[")
+      ) {
         section = heading;
       } else {
         section = heading;
@@ -186,7 +191,9 @@ export function buildBacklog(project = DEFAULT_PROJECT, options = {}) {
 
   if (featureNums?.length > 0 && selectedFeatures.length === 0) {
     const valid = featureFiles.map((feature) => feature.num).join(", ");
-    throw new Error(`Unknown feature number(s): ${featureNums.join(", ")}. Valid: ${valid}`);
+    throw new Error(
+      `Unknown feature number(s): ${featureNums.join(", ")}. Valid: ${valid}`,
+    );
   }
 
   const features = [];
