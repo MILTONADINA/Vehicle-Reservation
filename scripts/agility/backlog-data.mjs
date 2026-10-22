@@ -92,12 +92,18 @@ export function parseScenarios(content) {
   }
 
   const acBlock = content.slice(acIndex);
-  const lines = acBlock.split("\n");
+  // Skip the "## Acceptance Criteria" heading itself; stop at the next "## " section
+  // so lines like "**Reference updates…**" are not read as scenario steps.
+  const lines = acBlock.split("\n").slice(1);
   const scenarios = [];
   let section = "";
   let current = null;
 
   for (const line of lines) {
+    if (line.startsWith("## ")) {
+      break;
+    }
+
     if (line.startsWith("### ") && !line.startsWith("#### ")) {
       const heading = line.slice(4).trim();
       if (
@@ -151,11 +157,18 @@ export function formatGherkin(scenario) {
 }
 
 export function formatExpectedResults(scenario) {
-  const thenSteps = scenario.steps
-    .filter((step) => /^Then|^And/i.test(step.replace(/\*\*/g, "")))
-    .map((step) => step.replace(/\*\*/g, ""));
+  const steps = scenario.steps.map((step) => step.replace(/\*\*/g, ""));
+  // And/But only count as outcomes once Then has started; before that they continue Given/When.
+  const thenIndex = steps.findIndex((step) => /^Then\b/i.test(step));
 
-  return thenSteps.length > 0 ? thenSteps.join("\n") : formatGherkin(scenario);
+  if (thenIndex === -1) {
+    return formatGherkin(scenario);
+  }
+
+  return steps
+    .slice(thenIndex)
+    .filter((step) => /^(Then|And|But)\b/i.test(step))
+    .join("\n");
 }
 
 function storyDescription(story, feature, ref) {
