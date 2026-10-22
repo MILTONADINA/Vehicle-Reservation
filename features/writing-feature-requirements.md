@@ -2,7 +2,7 @@
 
 A student guide for drafting the **beginning** of a feature specification: header, user stories, functional requirements, **initial data model**, and acceptance criteria (AC).
 
-This is the **what**, **what data exists**, and **how we know it’s done** part of the file. Save API contracts and screen layouts for after these are clear. Full section order and process live in [framework.md](./framework.md). Canonical example: [feature-1-user-auth.md](./feature-1-user-auth.md).
+This is the **what**, **what data exists**, and **how we know it’s done** part of the file. Save API contracts and screen layouts for after these are clear. Full section order and process live in [framework.md](./framework.md). Canonical example: [feature-1-user-auth.md](../docs/examples/feature-1-user-auth.md).
 
 **File name:** `features/feature-N-short-name.md` (e.g. `feature-2-todo-list-management.md`)
 
@@ -30,11 +30,11 @@ A **user story** is one outcome *inside* that feature — something a person (or
 
 | Feature | Why it is a feature (not a story) |
 |---------|-----------------------------------|
-| [1 — User Authentication & Session Management](./feature-1-user-auth.md) | Whole identity boundary: register, session, protect routes. Foundation for every later feature. |
-| [2 — Todo List Management](./feature-2-todo-list-management.md) | Users own **lists** as a first-class thing (create/view/rename/delete + privacy). |
-| [3 — Todo List Item Management](./feature-3-todo-list-item-management.md) | Users own **items inside lists** (add/complete/edit/delete). Distinct entity and UI from Feature 2. |
-| [4 — User Profile Management](./feature-4-user-profile-management.md) | Profile view/edit and logout placement — account UX, not list/todo CRUD. |
-| [5 — Todo Due Date](./feature-5-todo-due-date.md) | A focused **delta** on existing todos (optional `dueDate` + overdue display). Still its own feature because it has its own FRs, AC, and branch. |
+| [1 — User Authentication & Session Management](../docs/examples/feature-1-user-auth.md) | Whole identity boundary: register, session, protect routes. Foundation for every later feature. |
+| [2 — Todo List Management](../docs/examples/feature-2-todo-list-management.md) | Users own **lists** as a first-class thing (create/view/rename/delete + privacy). |
+| [3 — Todo List Item Management](../docs/examples/feature-3-todo-list-item-management.md) | Users own **items inside lists** (add/complete/edit/delete). Distinct entity and UI from Feature 2. |
+| [4 — User Profile Management](../docs/examples/feature-4-user-profile-management.md) | Profile view/edit and logout placement — account UX, not list/todo CRUD. |
+| [5 — Todo Due Date](../docs/examples/feature-5-todo-due-date.md) | A focused **delta** on existing todos (optional `dueDate` + overdue display). Still its own feature because it has its own FRs, AC, and branch. |
 
 ### Stories inside a feature (examples)
 
@@ -505,4 +505,4 @@ After the requirements portion is solid, write the **design portion** using [wri
 
 **Suggested draft order:** Header → User Stories → FRs → Assumptions / Edge Cases / SC → **Key Entities + initial Data Model** → Gherkin AC → **then design sections** (see the design guide).
 
-When unsure about process or IDs, follow [framework.md](./framework.md) and mirror [feature-1-user-auth.md](./feature-1-user-auth.md).
+When unsure about process or IDs, follow [framework.md](./framework.md) and mirror [feature-1-user-auth.md](../docs/examples/feature-1-user-auth.md).

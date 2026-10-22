@@ -70,7 +70,7 @@ flowchart TD
 
 ## Feature spec template
 
-Every new feature uses `features/feature-N-short-name.md` with these sections **in order**. Copy [feature-1-user-auth.md](./feature-1-user-auth.md) as the canonical example.
+Every new feature uses `features/feature-N-short-name.md` with these sections **in order**. Copy [feature-1-user-auth.md](../docs/examples/feature-1-user-auth.md) as the canonical example.
 
 ### Header
 
