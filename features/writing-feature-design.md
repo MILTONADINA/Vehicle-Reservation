@@ -4,7 +4,7 @@ A student guide for drafting the **design / plan** half of a feature specificati
 
 **Write requirements first:** [writing-feature-requirements.md](./writing-feature-requirements.md) (header, stories, FRs, initial data model, Gherkin AC).  
 **Full process:** [framework.md](./framework.md).  
-**Canonical example:** [feature-2-todo-list-management.md](./feature-2-todo-list-management.md) (rich API + Screen) · [feature-1-user-auth.md](./feature-1-user-auth.md) (Test Coverage Map + DoD).
+**Canonical example:** [feature-2-todo-list-management.md](../docs/examples/feature-2-todo-list-management.md) (rich API + Screen) · [feature-1-user-auth.md](../docs/examples/feature-1-user-auth.md) (Test Coverage Map + DoD).
 
 This portion answers: *How do we structure ownership, contracts, UI, and verification so implementers (and Cursor) can build without guessing?*
 
