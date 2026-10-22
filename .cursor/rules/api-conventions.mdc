@@ -6,7 +6,7 @@ globs: "backend/**/*, **/*.routes.js, **/*.controller.js, **/*.model.js"
 
 ## Stack
 *   Node.js `"type": "module"` — import/export only.
-*   Express 4, mounted at `/todo/`.
+*   Express 4, mounted at `/vehicle-t6/`.
 *   Sequelize 6 + mysql2; config in `app/config/db.config.js` via dotenv.
 *   Separate `sequelizeInstance.js`; models import it and register in `models/index.js`.
 *   bcryptjs + jsonwebtoken + Session model for auth.
@@ -16,7 +16,7 @@ globs: "backend/**/*, **/*.routes.js, **/*.controller.js, **/*.model.js"
 *   `db.sequelize.sync()` on startup; optional `{ alter: true }` when `SEQUELIZE_SYNC_ALTER=true`.
 *   CORS with `credentials: true` and frontend origin.
 *   `express.json()` and `urlencoded({ extended: true })`.
-*   Mount routes: `app.use("/todo", routes)`.
+*   Mount routes: `app.use("/vehicle-t6", routes)`.
 *   Export `app` as default; call `listen()` only when `NODE_ENV !== "test"`.
 
 ## Route Layout

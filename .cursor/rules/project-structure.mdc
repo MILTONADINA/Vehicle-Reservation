@@ -8,7 +8,7 @@ Split frontend and backend in one repository. Specs in `features/` are the sourc
 
 ## Directory Layout
 ```
-todo-speckit/
+Vehicle-Reservation/
   features/                  # SDD specs
   frontend/                  # Vue 3 + Vite + Vuetify 4
     public/                  # .htaccess for SPA deploy
@@ -43,7 +43,7 @@ todo-speckit/
 
 ## Environment Variables
 Backend (`backend/.env`):
-*   `DB_HOST`, `DB_USER`, `DB_PW`, `DB_NAME` — MySQL connection (default database: `todospeckit-db`).
+*   `DB_HOST`, `DB_USER`, `DB_PW`, `DB_NAME` — MySQL connection (default database: `vehicle-t6`).
 *   `AUTH_SECRET` — JWT signing secret (required in production).
 *   `PORT` — default `3200`.
 *   `NODE_ENV` — `development` | `production` | `test`.
@@ -51,7 +51,7 @@ Backend (`backend/.env`):
 
 Frontend: use `import.meta.env.DEV` for dev/prod API base URL; `cross-env APP_ENV=development` in npm scripts.
 
-Backend test env (`backend/.env.test`): copy from `backend/.env.test.example`; uses `NODE_ENV=test` and `DB_NAME=todospeckit-db-test`.
+Backend test env (`backend/.env.test`): copy from `backend/.env.test.example`; uses `NODE_ENV=test` and `DB_NAME=vehicle-t6-test`.
 
 ## Dev Ports
 *   Frontend Vite: `8082`

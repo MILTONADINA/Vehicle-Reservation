@@ -1,5 +1,5 @@
 {
-  "name": "speckit-app",
+  "name": "vehicle-reservation",
   "private": true,
   "description": "Spec-driven app — monorepo root (deploy scripts orchestrate frontend/ and backend/)",
   "scripts": {
@@ -17,7 +17,7 @@
     "specs:pdf:app": "node scripts/export-app-specs-pdf.mjs",
     "specs:pdf:setup": "npx puppeteer browsers install chrome",
     "writing-guides:pdf": "node scripts/export-writing-guides-pdf.mjs",
-    "agility:export": "node scripts/export-agility-import.mjs --project \"Speckit App\"",
+    "agility:export": "node scripts/export-agility-import.mjs --project \"T6 - Vehicles\"",
     "agility:push": "node scripts/push-agility-api.mjs",
     "agility:push:dry-run": "node scripts/push-agility-api.mjs --dry-run",
     "agility:verify": "node scripts/push-agility-api.mjs --verify"

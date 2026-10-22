@@ -40,13 +40,13 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", routes);
+app.use("/vehicle-t6", routes);
 
 const PORT = process.env.PORT || 3200;
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => {
-    logger.info(`Speckit App API running on port ${PORT}`);
+    logger.info(`Vehicle Reservation API running on port ${PORT}`);
   });
 }
 

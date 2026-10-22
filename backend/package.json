@@ -1,8 +1,8 @@
 {
-  "name": "speckit-app-backend",
+  "name": "vehicle-reservation-backend",
   "version": "1.0.0",
   "type": "module",
-  "description": "Speckit App — Node.js REST API",
+  "description": "Vehicle Reservation — Node.js REST API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

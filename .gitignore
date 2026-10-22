@@ -8,7 +8,7 @@ backend/deploy/
 backend/logs/
 *.log
 .DS_Store
-docs/todo-speckit-specs.md
-docs/todo-speckit-specs.pdf
-docs/todo-speckit-features.md
-docs/todo-speckit-features.pdf
+docs/speckit-specs.md
+docs/speckit-specs.pdf
+docs/app-specs.md
+docs/app-specs.pdf

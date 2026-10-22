@@ -17,7 +17,7 @@ globs: "frontend/src/**/*.js, frontend/vite.config.js"
 *   No axios calls inside views or components — always go through `*Services.js`.
 
 ## Axios Client (`services/services.js`)
-*   Dev `baseURL`: `http://localhost:3200/todo/`; prod: `/todo/`.
+*   Dev `baseURL`: `http://localhost:3200/vehicle-t6/`; prod: `/vehicle-t6/`.
 *   `withCredentials: true`.
 *   `transformRequest`: attach `Authorization: Bearer <token>` from `Utils.getStore("user")`.
 *   `transformResponse`: on unauthorized message, clear user and `Router.push({ name: "login" })`.

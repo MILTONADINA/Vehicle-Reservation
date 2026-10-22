@@ -1,4 +1,4 @@
-# Speckit App
+# Vehicle Reservation
 
 Spec-Driven Development (SDD) starter kit — **empty product shell**.
 
@@ -18,7 +18,7 @@ This repository was generated from the Speckit starter kit. Replace this README�
 | Backend | Node.js (ES modules), Express, Sequelize, MySQL |
 | Tests | Jest + supertest (backend), Vitest + `@vue/test-utils` (frontend) |
 
-Default ports: frontend `8082`, backend `3200`. API mount: `/api` (change in `backend/server.js` and `frontend/src/services/services.js`).
+Default ports: frontend `8082`, backend `3200`. API mount: `/vehicle-t6` (set in `backend/server.js` and `frontend/src/services/services.js`).
 
 ---
 
@@ -35,7 +35,7 @@ cp backend/.env.test.example backend/.env.test
 # Windows PowerShell / cmd:
 #   copy backend\.env.example backend\.env
 #   copy backend\.env.test.example backend\.env.test
-# Create MySQL databases; set DB_* and AUTH_SECRET
+# Create MySQL databases `vehicle-t6` and `vehicle-t6-test`; set DB_* and AUTH_SECRET
 
 npm test
 cd backend && npm run dev
@@ -59,6 +59,6 @@ git checkout -b feature/1-short-name
 
 ## Next steps
 
-1. Write `features/feature-1-….md` (see [framework template](../../features/framework.md#feature-spec-template) — **Status**, **Input**, **FR-00N**, **SC-00N**, **Key Entities**, **Agent implementation request**, **Definition of Done**).
+1. Write `features/feature-1-….md` (see [framework template](features/framework.md#feature-spec-template) — **Status**, **Input**, **FR-00N**, **SC-00N**, **Key Entities**, **Agent implementation request**, **Definition of Done**).
 2. Update `features/README.md` catalog.
 3. Implement with Cursor: `Implement @features/feature-1-….md per its Agent implementation request and Definition of Done`, or one layer at a time (reference updates in the same PR when API/schema changes).
