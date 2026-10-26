@@ -18,7 +18,7 @@ No application code may be written unless it maps to a requirement in one of the
 |----|---------|------|--------|------------|--------|----------|
 | 1 | User Authentication & Authorization | *not yet written* | `feature/1-user-authentication-authorization` | — | Milton | Morgan |
 | 2 | Area Management | *not yet written* | `feature/2-area-management` | 1 | Milton | Morgan |
-| 3 | User Management | *not yet written* | `feature/3-user-management` | 1, 2 | Milton | Morgan |
+| 3 | User Management | [feature-3-user-management.md](./feature-3-user-management.md) | `feature/3-user-management` | 1, 2 | Milton | Morgan |
 | 4 | Vehicle Management | *not yet written* | `feature/4-vehicle-management` | 1, 2 | Landry | Milton |
 | 5 | Driver Management | *not yet written* | `feature/5-driver-management` | 1 | Morgan | Landry |
 | 6 | Destination Management | *not yet written* | `feature/6-destination-management` | 1 | Morgan | Landry |
