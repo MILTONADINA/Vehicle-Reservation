@@ -5,7 +5,7 @@
 **Status:** Ready  
 **Created:** 2026-10-28  
 **Input:** Give admins and area admins a weekly calendar of reservation requests with status and vehicle, plus a service queue of requests that still need a vehicle or need check-in after the trip.  
-**Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog), [Feature 10 — Vehicle Issue Reports in the catalog](README.md#feature-catalog)
+**Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests in the catalog](README.md#feature-catalog), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
 
 ---
 
@@ -15,27 +15,27 @@ Every story is P1: each one must ship for the assignment’s weekly schedule and
 
 ### US-11.1: View the weekly schedule
 
-**As an** area administrator  
+**As the** area administrator  
 **I want to** see this week’s reservation requests with status and vehicle  
 **So that** I know what trips are on the calendar for my area
 
 **Priority:** P1  
-**Independent test:** Load a week as admin and as area_admin; verify admin sees every overlapping request and area_admin sees only its area  
+**Independent test:** Load a week as admin and as area_admin; verify admin sees every overlapping non-cancelled request and area_admin sees only its area  
 **Acceptance scenarios:** see ### US-11.1 under Acceptance Criteria
 
 ### US-11.2: View the service queue
 
-**As an** area administrator  
+**As the** area administrator  
 **I want to** see requests that need a vehicle or need check-in  
 **So that** I can finish assignment and return work
 
 **Priority:** P1  
-**Independent test:** Verify Need vehicle lists Awaiting vehicle requests and Need check-in lists Reserved requests whose end is past, with area scope  
+**Independent test:** Verify Need vehicle lists awaiting_vehicle requests and Need check-in lists reserved requests whose return is past, with area scope  
 **Acceptance scenarios:** see ### US-11.2 under Acceptance Criteria
 
 ### US-11.3: Move between weeks on the schedule
 
-**As an** area administrator  
+**As the** area administrator  
 **I want to** open the previous or next week  
 **So that** I can plan around other trip dates
 
@@ -57,14 +57,14 @@ Every story is P1: each one must ship for the assignment’s weekly schedule and
 
 ### Functional Requirements
 
-* **FR-001:** This feature MUST reuse Feature 1 authentication and roles, Feature 4 vehicle identity when a request has vehicleId, and the reservation request fields and statuses from Features 7, 8, and 10. It MUST NOT create requests, assign vehicles, mark Returned, or send email.
+* **FR-001:** This feature MUST reuse Feature 1 authentication and roles, Feature 4 vehicle identity when a request has vehicleId, and the reservation request fields and shared statuses from Features 7 and 8. It MUST NOT create requests, assign vehicles, mark Returned, or send email. Mark Returned belongs only to Feature 8’s shared status-change operation.
 * **FR-002:** Schedule and queue reads MUST use the existing reservation request rows. This feature MUST NOT add a new table.
-* **FR-003:** A schedule entry MUST expose request id, areaId, status, startAt, endAt, requestor display name or requestorUserId, vehicleId, and vehicle label when a vehicle is assigned (make, model, and plateNumber from Feature 4). Missing vehicle fields MUST be null.
-* **FR-004:** GET schedule MUST accept `weekStart` as a `YYYY-MM-DD` date that is a Monday. The week runs Monday 00:00:00 through Sunday 23:59:59.999 in the server’s local date handling for that calendar date. Requests that overlap that range MUST be included. Overlap means startAt <= weekEnd AND endAt >= weekStart.
+* **FR-003:** A schedule entry MUST expose request id, areaId, status, departureDate, departureTime, returnDate, returnTime, requestor display name or requestorUserId, vehicleId, and vehicle label when a vehicle is assigned (make, model, and plateNumber from Feature 4). Missing vehicle fields MUST be null. Status values MUST be the Feature 7/8 shared values: `requested`, `awaiting_vehicle`, `reserved`, `returned`, `cancelled`.
+* **FR-004:** GET schedule MUST accept `weekStart` as a `YYYY-MM-DD` date that is a Monday. The week runs Monday 00:00:00 through Sunday 23:59:59.999 in the server’s local date handling for that calendar date. Requests that overlap that range MUST be included except requests whose status is `cancelled`, which MUST be excluded. Overlap uses each request’s departureDate/departureTime and returnDate/returnTime, treating null times as whole-day bounds (00:00 start, 23:59 end) per Feature 7.
 * **FR-005:** Missing weekStart MUST default to the Monday of the current server date. An invalid weekStart or a date that is not a Monday MUST return 400 `Invalid schedule data.`
-* **FR-006:** Schedule results MUST sort by startAt ascending, then id ascending. An empty week MUST be 200 with [].
-* **FR-007:** The service queue MUST return two arrays in one response: `needVehicle` and `needCheckIn`. `needVehicle` MUST contain requests with status `Awaiting vehicle`. `needCheckIn` MUST contain requests with status `Reserved` whose endAt is earlier than the server’s current time. Other statuses MUST NOT appear in either list.
-* **FR-008:** Queue lists MUST sort by startAt ascending, then id ascending. Either array MAY be empty. The response MUST still be 200 with both arrays present.
+* **FR-006:** Schedule results MUST sort by departureDate ascending, departureTime ascending with nulls first, then id ascending. An empty week MUST be 200 with [].
+* **FR-007:** The service queue MUST return two arrays in one response: `needVehicle` and `needCheckIn`. `needVehicle` MUST contain requests with status `awaiting_vehicle`. `needCheckIn` MUST contain requests with status `reserved` whose effective return (returnDate with returnTime, or end of returnDate when returnTime is null) is earlier than the server’s current time. Statuses `requested`, `returned`, and `cancelled` MUST NOT appear in either list.
+* **FR-008:** Queue lists MUST sort by departureDate ascending, departureTime ascending with nulls first, then id ascending. Either array MAY be empty. The response MUST still be 200 with both arrays present.
 * **FR-009:** Admin MUST see schedule and queue rows for every area. An area_admin MUST see only rows whose request areaId equals that user’s current database areaId. An area_admin with null areaId MUST receive empty schedule and queue results.
 * **FR-010:** Requestor and maintenance MUST receive the Feature 1 403 response for schedule and queue endpoints. Signed-out requests MUST receive 401.
 * **FR-011:** Scope MUST use the current database role and areaId. Client area filters MUST NOT widen an area_admin’s results. Admin MAY optionally pass `areaId` as a positive integer to narrow the schedule or queue to one area; an unknown areaId MUST return 404 `Area with id=<id> not found.` Area_admin callers MUST ignore a forged areaId query and keep their own area scope.
@@ -74,16 +74,17 @@ Every story is P1: each one must ship for the assignment’s weekly schedule and
 
 ## Assumptions
 
-* Features 7 and 8 provide reservation requests with id, requestorUserId, areaId, status, nullable vehicleId, startAt, and endAt. Feature 10 adds status `Returned`. Status values used here are `Requested`, `Awaiting vehicle`, `Reserved`, and `Returned`.
-* “Need a vehicle” means status `Awaiting vehicle` from Feature 8. “Need check-in” means the trip end is past and status is still `Reserved`, so staff can mark Returned in Feature 10.
-* Requested requests that are not yet Awaiting vehicle stay off the service queue. Returned requests stay off both queue lists and may still appear on the weekly schedule when their dates overlap the week.
-* This feature is read-only. Assignment stays in Feature 8. Returned stays in Feature 10.
+* Features 7 and 8 provide reservation requests with id, requestorUserId, areaId, status, nullable vehicleId, departureDate, nullable departureTime, returnDate, and nullable returnTime. Feature 8 adds vehicleId and owns Returned via `PUT /vehicle-t6/reservation-requests/:id/status`. This feature references those contracts; it does not redefine field names or status strings.
+* “Need a vehicle” means status `awaiting_vehicle` from Feature 8. “Need check-in” means the trip return is past and status is still `reserved`, so staff can mark Returned in Feature 8.
+* Requested requests that are not yet awaiting_vehicle stay off the service queue. Returned and cancelled requests stay off both queue lists. Cancelled requests also stay off the weekly schedule. Returned requests may still appear on the weekly schedule when their dates overlap the week.
+* This feature is read-only. Assignment and Returned stay in Feature 8.
 * Vehicle make, model, and plateNumber come from Feature 4 when vehicleId is set.
 
 ## Edge Cases
 
-* A request that starts before the week and ends during or after it still appears on that week’s schedule.
-* A week with no overlapping requests returns an empty schedule array, not an error.
+* A request that starts before the week and ends during or after it still appears on that week’s schedule when it is not cancelled.
+* A cancelled request that overlaps the week is omitted from the schedule.
+* A week with no overlapping non-cancelled requests returns an empty schedule array, not an error.
 * An area admin with no area assignment sees empty schedule and empty queue lists.
 * Failed schedule load does not show `No reservations this week.`
 * A forged areaId query does not let an area_admin see another area.
@@ -92,7 +93,7 @@ Every story is P1: each one must ship for the assignment’s weekly schedule and
 
 * **SC-001:** Schedule and queue responses match the documented contract and sort rules.
 * **SC-002:** Admin and area-admin scope rules hold for every mapped acceptance case.
-* **SC-003:** Need vehicle and Need check-in membership rules exclude the wrong statuses.
+* **SC-003:** Need vehicle and Need check-in membership rules exclude the wrong statuses, and cancelled requests stay off the schedule.
 * **SC-004:** Week navigation, empty, loading, and error UI cases have matching frontend tests and a manual check.
 * **SC-005:** Every scenario has an exact-name test before merge.
 
@@ -103,12 +104,12 @@ Every story is P1: each one must ship for the assignment’s weekly schedule and
 | Weekly schedule | All areas; optional areaId filter | Own area only | 403 |
 | Service queue | All areas; optional areaId filter | Own area only | 403 |
 
-Authentication comes from [Feature 1](feature-1-user-authentication-authorization.md). Requests come from Features 7, 8, and 10. Vehicles come from [Feature 4](feature-4-vehicle-management.md).
+Authentication comes from [Feature 1](feature-1-user-authentication-authorization.md). Requests come from Features 7 and 8. Vehicles come from [Feature 4](feature-4-vehicle-management.md).
 
 ## Key Entities
 
-* **Weekly schedule entry:** a reservation request that overlaps a Monday–Sunday week, shown with status and vehicle.
-* **Service queue:** the staff list of requests that still need a vehicle (`Awaiting vehicle`) or need check-in (`Reserved` with endAt in the past).
+* **Weekly schedule entry:** a non-cancelled reservation request that overlaps a Monday–Sunday week, shown with status and vehicle.
+* **Service queue:** the staff list of requests that still need a vehicle (`awaiting_vehicle`) or need check-in (`reserved` with return in the past).
 
 ## API Requirements
 
@@ -130,9 +131,11 @@ ScheduleItem:
 {
   "id": 10,
   "areaId": 2,
-  "status": "Reserved",
-  "startAt": "2026-11-03T09:00:00.000Z",
-  "endAt": "2026-11-05T17:00:00.000Z",
+  "status": "reserved",
+  "departureDate": "2026-11-03",
+  "departureTime": "09:00",
+  "returnDate": "2026-11-05",
+  "returnTime": "17:00",
   "requestorUserId": 8,
   "requestorName": "Avery Reed",
   "vehicleId": 3,
@@ -140,7 +143,7 @@ ScheduleItem:
 }
 ```
 
-`vehicleId` and `vehicleLabel` are null when no vehicle is assigned. `requestorName` is firstName + space + lastName from the requestor user when available; otherwise null. `weekEnd` is the Sunday of that week as `YYYY-MM-DD`.
+`departureTime` and `returnTime` may be null for whole-day trips. `vehicleId` and `vehicleLabel` are null when no vehicle is assigned. `requestorName` is firstName + space + lastName from the requestor user when available; otherwise null. `weekEnd` is the Sunday of that week as `YYYY-MM-DD`.
 
 | Failure | Status | Message |
 |---------|--------|---------|
@@ -156,23 +159,23 @@ ScheduleItem:
 
 * `/schedule`, route name `schedule`, heading **Schedule**. MenuBar shows **Schedule** for admin and area_admin only. Signed-out visitors follow Feature 1 Login redirect. Requestor and maintenance are sent Home.
 * The page has two sections: **This week** and **Service queue**.
-* **This week** shows the current `weekStart`–`weekEnd` label, **Previous week** and **Next week** controls, and a list or day-grouped calendar of schedule items. Each item shows request id or requestor name, status, start and end, and vehicle label or `No vehicle`. Selecting an item may navigate to the existing request detail route from Features 7/8 when that route exists; this feature does not invent a new detail page.
+* **This week** shows the current `weekStart`–`weekEnd` label, **Previous week** and **Next week** controls, and a list or day-grouped calendar of schedule items. Each item shows request id or requestor name, status, departure and return (date and optional time), and vehicle label or `No vehicle`. Selecting an item may navigate to the existing request detail route from Features 7/8 when that route exists; this feature does not invent a new detail page.
 * Admin may use an **Area** filter combo filled from Feature 2. Area_admin does not see an area filter; their list is already scoped.
 * **Service queue** has two lists: **Need vehicle** and **Need check-in**. Each row shows the same ScheduleItem fields. Empty each list only after a successful load.
 * Schedule and queue each show progress while loading. Schedule empty text is `No reservations this week.` Queue empty texts are `No requests need a vehicle.` and `No requests need check-in.` Failures show the API message or the fallbacks in FR-013.
 
 ## Data Model Requirements
 
-No new tables. Read reservation requests from Features 7/8/10 and join Feature 4 vehicles when `vehicleId` is present. requestorName comes from the Feature 1 user row for `requestorUserId`.
+No new tables. Read reservation requests from Features 7 and 8 and join Feature 4 vehicles when `vehicleId` is present. requestorName comes from the Feature 1 user row for `requestorUserId`.
 
 ## Acceptance Criteria (Gherkin)
 
 ### US-11.1 — View the weekly schedule
 
 #### Scenario: Admin lists schedule items for the week
-* **Given** reserved and awaiting-vehicle requests overlap the week starting 2026-11-02
+* **Given** reserved and awaiting_vehicle requests overlap the week starting 2026-11-02
 * **When** an admin requests GET /vehicle-t6/schedule?weekStart=2026-11-02
-* **Then** the response is 200 with weekStart 2026-11-02, weekEnd 2026-11-08, and those overlapping requests sorted by startAt then id
+* **Then** the response is 200 with weekStart 2026-11-02, weekEnd 2026-11-08, and those overlapping requests sorted by departureDate, departureTime, then id
 
 #### Scenario: Area admin lists only its area on the schedule
 * **Given** an area_admin has areaId 2 and overlapping requests exist in areas 1 and 2 for the week
@@ -189,17 +192,22 @@ No new tables. Read reservation requests from Features 7/8/10 and join Feature 4
 * **When** an admin requests the schedule for weekStart 2026-11-02
 * **Then** that request is included in items
 
+#### Scenario: Cancelled requests stay off the schedule
+* **Given** a cancelled request overlaps weekStart 2026-11-02
+* **When** an admin requests that schedule
+* **Then** the cancelled request is not included in items
+
 #### Scenario: Empty week returns an empty schedule
-* **Given** no requests overlap weekStart 2026-11-02
+* **Given** no non-cancelled requests overlap weekStart 2026-11-02
 * **When** an admin requests that schedule
 * **Then** the response is 200 with items []
 
 #### Scenario: Assigned vehicle label is included
-* **Given** a overlapping Reserved request has vehicleId for a Ford Transit with plate OC-4521
+* **Given** an overlapping reserved request has vehicleId for a Ford Transit with plate OC-4521
 * **When** an admin requests the schedule
 * **Then** that item includes vehicleId and vehicleLabel containing Ford Transit and OC-4521
 
-#### Scenario: Schedule page shows the week’s items
+#### Scenario: Schedule page shows the week items
 * **Given** GET /schedule returns items for the current week
 * **When** an admin or area_admin opens /schedule from MenuBar
 * **Then** each item shows status, times, and vehicle label or No vehicle
@@ -217,19 +225,19 @@ No new tables. Read reservation requests from Features 7/8/10 and join Feature 4
 ### US-11.2 — View the service queue
 
 #### Scenario: Admin lists requests that need a vehicle
-* **Given** requests exist with statuses Awaiting vehicle, Reserved, and Requested
+* **Given** requests exist with statuses awaiting_vehicle, reserved, and requested
 * **When** an admin requests GET /vehicle-t6/service-queue
-* **Then** needVehicle contains only Awaiting vehicle requests sorted by startAt then id
+* **Then** needVehicle contains only awaiting_vehicle requests sorted by departureDate, departureTime, then id
 
 #### Scenario: Admin lists requests that need check-in
-* **Given** a Reserved request has endAt in the past and another Reserved request has endAt in the future
+* **Given** a reserved request has return in the past and another reserved request has return in the future
 * **When** an admin requests the service queue
-* **Then** needCheckIn contains only the past-end Reserved request
+* **Then** needCheckIn contains only the past-return reserved request
 
-#### Scenario: Returned and requested requests stay off the queue
-* **Given** Returned and Requested requests exist
+#### Scenario: Returned requested and cancelled requests stay off the queue
+* **Given** returned, requested, and cancelled requests exist
 * **When** an admin requests the service queue
-* **Then** neither appears in needVehicle or needCheckIn
+* **Then** none of them appear in needVehicle or needCheckIn
 
 #### Scenario: Area admin queue is limited to its area
 * **Given** an area_admin has areaId 2 and queue-eligible requests exist in areas 1 and 2
@@ -320,14 +328,15 @@ Exact `it(...)` titles. Backend file: `backend/tests/schedule.test.js`. Frontend
 | US-11.1 | Area admin lists only its area on the schedule | `backend/tests/schedule.test.js` | `it("Area admin lists only its area on the schedule")` |
 | US-11.1 | Area admin without an assignment gets an empty schedule | `backend/tests/schedule.test.js` | `it("Area admin without an assignment gets an empty schedule")` |
 | US-11.1 | Request spanning the week start is included | `backend/tests/schedule.test.js` | `it("Request spanning the week start is included")` |
+| US-11.1 | Cancelled requests stay off the schedule | `backend/tests/schedule.test.js` | `it("Cancelled requests stay off the schedule")` |
 | US-11.1 | Empty week returns an empty schedule | `backend/tests/schedule.test.js` | `it("Empty week returns an empty schedule")` |
 | US-11.1 | Assigned vehicle label is included | `backend/tests/schedule.test.js` | `it("Assigned vehicle label is included")` |
-| US-11.1 | Schedule page shows the week’s items | `frontend/tests/Schedule.test.js` | `it("Schedule page shows the week's items")` |
+| US-11.1 | Schedule page shows the week items | `frontend/tests/Schedule.test.js` | `it("Schedule page shows the week items")` |
 | US-11.1 | Schedule page distinguishes loading empty and failed states | `frontend/tests/Schedule.test.js` | `it("Schedule page distinguishes loading empty and failed states")` |
 | US-11.1 | Schedule failure does not show an empty week | `frontend/tests/Schedule.test.js` | `it("Schedule failure does not show an empty week")` |
 | US-11.2 | Admin lists requests that need a vehicle | `backend/tests/schedule.test.js` | `it("Admin lists requests that need a vehicle")` |
 | US-11.2 | Admin lists requests that need check-in | `backend/tests/schedule.test.js` | `it("Admin lists requests that need check-in")` |
-| US-11.2 | Returned and requested requests stay off the queue | `backend/tests/schedule.test.js` | `it("Returned and requested requests stay off the queue")` |
+| US-11.2 | Returned requested and cancelled requests stay off the queue | `backend/tests/schedule.test.js` | `it("Returned requested and cancelled requests stay off the queue")` |
 | US-11.2 | Area admin queue is limited to its area | `backend/tests/schedule.test.js` | `it("Area admin queue is limited to its area")` |
 | US-11.2 | Empty service queue arrays are returned | `backend/tests/schedule.test.js` | `it("Empty service queue arrays are returned")` |
 | US-11.2 | Service queue section shows both lists | `frontend/tests/Schedule.test.js` | `it("Service queue section shows both lists")` |
@@ -375,8 +384,8 @@ Do not implement behavior not in this spec.
 ## Out of Scope
 
 * Creating or editing reservation requests: [Feature 7 — Reservation Requests in the catalog](README.md#feature-catalog).
-* Assigning a vehicle or setting Awaiting vehicle / Reserved: [Feature 8 — Request Processing in the catalog](README.md#feature-catalog).
-* Marking Returned or creating issue reports: [Feature 10 — Vehicle Issue Reports in the catalog](README.md#feature-catalog).
+* Assigning a vehicle, setting awaiting_vehicle / reserved, or marking Returned: [Feature 8 — Request Processing in the catalog](README.md#feature-catalog).
+* Creating issue reports: [Feature 10 — Vehicle Issue Reports in the catalog](README.md#feature-catalog).
 * Reservation emails: [Feature 9 — Reservation Emails in the catalog](README.md#feature-catalog).
 * Mileage and service logs: [Feature 12 — Mileage & Service Logs in the catalog](README.md#feature-catalog).
 * Drag-and-drop calendar editing or printing a PDF schedule.
