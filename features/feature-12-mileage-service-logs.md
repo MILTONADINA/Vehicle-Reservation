@@ -72,6 +72,7 @@ Every story is P1: each one must ship for the assignment’s mileage and service
 * **FR-013:** List loading MUST show progress. Empty texts MUST appear only after successful empty responses. Load failures MUST show the API message or fallback without claiming the list is empty.
 * **FR-014:** Database failures MUST return 500 `Mileage request failed.` for mileage endpoints and 500 `Service log request failed.` for service endpoints, without SQL details or partial writes.
 * **FR-015:** Viewing Feature 10 `maintenance_need` issues stays on the Feature 10 Issues page. This feature MUST NOT re-implement that list.
+* **FR-016:** Foreign keys from `mileage_logs` and `service_logs` MUST use `ON DELETE RESTRICT` for vehicleId and loggedByUserId. Deleting a vehicle that still has mileage or service logs MUST return 409 `Vehicle is in use.` Deleting a user who logged a mileage or service entry MUST return 409 `User is in use.` This feature owns those 409 tests because it adds the references.
 
 ## Assumptions
 
@@ -88,6 +89,7 @@ Every story is P1: each one must ship for the assignment’s mileage and service
 * A blank service note is stored as null.
 * Failed creates leave prior logs unchanged.
 * A forged loggedByUserId in the body does not change the saved reporter.
+* Deleting a referenced vehicle or logger user is blocked with 409; existing logs stay.
 
 ## Success Criteria
 
@@ -95,7 +97,7 @@ Every story is P1: each one must ship for the assignment’s mileage and service
 * **SC-002:** Only admin and maintenance succeed on every mapped access case.
 * **SC-003:** Invalid dates, types, vehicle ids, and lower mileage readings do not change data.
 * **SC-004:** Dialog, loading, empty, and error UI cases have matching frontend tests and a manual check.
-* **SC-005:** Every scenario has an exact-name test before merge.
+* **SC-005:** Referenced vehicle and logger deletion returns the documented 409 responses, and every scenario has an exact-name test before merge.
 
 ## Data Ownership & Isolation
 
@@ -181,6 +183,8 @@ ServiceLog object:
 | Invalid vehicle route id | 400 | `Vehicle id must be a positive integer.` |
 | Missing vehicle | 404 | `Vehicle with id=<id> not found.` |
 | Mileage lower than latest reading | 409 | `Mileage cannot be lower than the latest reading.` |
+| Delete of vehicle that still has mileage or service logs | 409 | `Vehicle is in use.` |
+| Delete of user who logged a mileage or service entry | 409 | `User is in use.` |
 | Other database failure on mileage | 500 | `Mileage request failed.` |
 | Other database failure on service logs | 500 | `Service log request failed.` |
 
@@ -201,7 +205,7 @@ Add `mileage_logs`:
 | Field | Type | Rule |
 |-------|------|------|
 | id | Integer | Auto-generated primary key |
-| vehicleId | Integer | Required foreign key to `vehicles.id`, `ON DELETE CASCADE` |
+| vehicleId | Integer | Required foreign key to `vehicles.id`, `ON DELETE RESTRICT` |
 | logDate | Date only | Required; `YYYY-MM-DD` |
 | mileage | Integer | Required; 0 through 2,000,000 |
 | loggedByUserId | Integer | Required foreign key to `users.id`, `ON DELETE RESTRICT` |
@@ -212,7 +216,7 @@ Add `service_logs`:
 | Field | Type | Rule |
 |-------|------|------|
 | id | Integer | Auto-generated primary key |
-| vehicleId | Integer | Required foreign key to `vehicles.id`, `ON DELETE CASCADE` |
+| vehicleId | Integer | Required foreign key to `vehicles.id`, `ON DELETE RESTRICT` |
 | serviceDate | Date only | Required; `YYYY-MM-DD` |
 | serviceType | Enum | `repair`, `oil_change`, `tire_replacement` |
 | note | String(1000) | Nullable; trimmed; blank becomes null |
@@ -376,10 +380,20 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **When** an admin lists or creates mileage or service logs for vehicle 9999
 * **Then** the response is 404 with message Vehicle with id=9999 not found.
 
-#### Scenario: Invalid vehicle route id is rejected
+#### Scenario: Invalid vehicle id is rejected for logs
 * **Given** an admin is signed in
 * **When** a mileage or service route is called with vehicle id abc, 0, -1, or an unsafe integer
 * **Then** each response is 400 with message Vehicle id must be a positive integer.
+
+#### Scenario: Referenced vehicle cannot be deleted while logs exist
+* **Given** vehicle id 3 has a mileage log or a service log
+* **When** an admin deletes vehicle 3
+* **Then** the response is 409 with message Vehicle is in use. and the vehicle and logs remain
+
+#### Scenario: Referenced logger user cannot be deleted while in use
+* **Given** user id 12 logged a mileage or service entry
+* **When** an admin deletes user 12
+* **Then** the response is 409 with message User is in use. and the user and logs remain
 
 #### Scenario: Maintenance navigation requires an allowed role
 * **Given** a signed-out visitor opens /maintenance
@@ -426,7 +440,9 @@ Exact `it(...)` titles. Backend file: `backend/tests/maintenanceLogs.test.js`. F
 | US-12.4 | Requestor cannot use maintenance logging | `backend/tests/maintenanceLogs.test.js` | `it("Requestor cannot use maintenance logging")` |
 | US-12.4 | Area admin cannot use maintenance logging | `backend/tests/maintenanceLogs.test.js` | `it("Area admin cannot use maintenance logging")` |
 | US-12.4 | Missing vehicle is rejected for logs | `backend/tests/maintenanceLogs.test.js` | `it("Missing vehicle is rejected for logs")` |
-| US-12.4 | Invalid vehicle route id is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Invalid vehicle route id is rejected")` |
+| US-12.4 | Invalid vehicle id is rejected for logs | `backend/tests/maintenanceLogs.test.js` | `it("Invalid vehicle id is rejected for logs")` |
+| US-12.4 | Referenced vehicle cannot be deleted while logs exist | `backend/tests/maintenanceLogs.test.js` | `it("Referenced vehicle cannot be deleted while logs exist")` |
+| US-12.4 | Referenced logger user cannot be deleted while in use | `backend/tests/maintenanceLogs.test.js` | `it("Referenced logger user cannot be deleted while in use")` |
 | US-12.4 | Maintenance navigation requires an allowed role | `frontend/tests/MaintenanceLogs.test.js` | `it("Maintenance navigation requires an allowed role")` |
 | US-12.4 | Requestor and area admin are sent Home from Maintenance | `frontend/tests/MaintenanceLogs.test.js` | `it("Requestor and area admin are sent Home from Maintenance")` |
 
@@ -448,7 +464,7 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-015** satisfied)
+* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-016** satisfied)
 * [ ] **Success Criteria (SC-001**–**SC-005)** met
 * [ ] All mapped tests pass (`npm test`)
 * [ ] Test Coverage Map complete
