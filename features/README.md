@@ -17,11 +17,11 @@ No application code may be written unless it maps to a requirement in one of the
 | ID | Feature | File | Branch | Depends on | Author | Reviewer |
 |----|---------|------|--------|------------|--------|----------|
 | 1 | User Authentication & Authorization | [feature-1-user-authentication-authorization.md](./feature-1-user-authentication-authorization.md) | `feature/1-user-authentication-authorization` | — | Milton | Morgan |
-| 2 | Area Management | *not yet written* | `feature/2-area-management` | 1 | Milton | Morgan |
-| 3 | User Management | *not yet written* | `feature/3-user-management` | 1, 2 | Milton | Morgan |
-| 4 | Vehicle Management | *not yet written* | `feature/4-vehicle-management` | 1, 2 | Landry | Milton |
-| 5 | Driver Management | *not yet written* | `feature/5-driver-management` | 1 | Morgan | Landry |
-| 6 | Destination Management | *not yet written* | `feature/6-destination-management` | 1 | Morgan | Landry |
+| 2 | Area Management | [feature-2-area-management.md](./feature-2-area-management.md) | `feature/2-area-management` | 1 | Milton | Morgan |
+| 3 | User Management | [feature-3-user-management.md](./feature-3-user-management.md) | `feature/3-user-management` | 1, 2 | Milton | Morgan |
+| 4 | Vehicle Management | [feature-4-vehicle-management.md](./feature-4-vehicle-management.md) | `feature/4-vehicle-management` | 1, 2 | Landry | Milton |
+| 5 | Driver Management | [feature-5-driver-management.md](./feature-5-driver-management.md) | `feature/5-driver-management` | 1 | Morgan | Landry |
+| 6 | Destination Management | [feature-6-destination-management.md](./feature-6-destination-management.md) | `feature/6-destination-management` | 1 | Morgan | Landry |
 | 7 | Reservation Requests | *not yet written* | `feature/7-reservation-requests` | 1, 2, 5, 6 | Morgan | Landry |
 | 8 | Request Processing | *not yet written* | `feature/8-request-processing` | 4, 7 | Morgan | Landry |
 | 9 | Reservation Emails | *not yet written* | `feature/9-reservation-emails` | 2, 4, 8 | Milton | Morgan |
