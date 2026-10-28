@@ -26,7 +26,7 @@ No application code may be written unless it maps to a requirement in one of the
 | 8 | Request Processing | *not yet written* | `feature/8-request-processing` | 4, 7 | Morgan | Landry |
 | 9 | Reservation Emails | *not yet written* | `feature/9-reservation-emails` | 2, 4, 8 | Milton | Morgan |
 | 10 | Vehicle Issue Reports | *not yet written* | `feature/10-vehicle-issue-reports` | 4, 8 | Landry | Milton |
-| 11 | Weekly Vehicle Schedule | *not yet written* | `feature/11-weekly-vehicle-schedule` | 4, 8 | Landry | Milton |
+| 11 | Weekly Vehicle Schedule | [feature-11-weekly-vehicle-schedule.md](./feature-11-weekly-vehicle-schedule.md) | `feature/11-weekly-vehicle-schedule` | 4, 8 | Landry | Milton |
 | 12 | Mileage & Service Logs | *not yet written* | `feature/12-mileage-service-logs` | 4 | Landry | Milton |
 
 When you write a spec, replace *not yet written* with a link to your `feature-N-short-name.md` in the same PR.
