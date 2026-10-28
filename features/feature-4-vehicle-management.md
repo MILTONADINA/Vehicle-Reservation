@@ -4,7 +4,7 @@
 **Branch pattern:** `feature/4-vehicle-management`  
 **Status:** Ready  
 **Created:** 2026-10-27  
-**Input:** Allow admins and area admins to maintain the OC fleet. A vehicle has make, model, year, VIN, purchased date, color, passenger count, plate number, plate expire month, and an assigned area. Make and model come from a standard combo-box list.  
+**Input:** Allow admins and area admins to maintain the OC fleet. A vehicle has make, model, year, VIN, purchased date, color, passenger count, plate number, plate expire month, designated parking, and an assigned area. Make and model come from a standard combo-box list.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 2 — Area Management](feature-2-area-management.md)
 
 ---
@@ -50,7 +50,7 @@ Every story is P1: each one must ship for the assignment’s Vehicle Management 
 **So that** obsolete vehicles leave the fleet list
 
 **Priority:** P1  
-**Independent test:** Delete an unused in-scope vehicle and reject deletion when the vehicle is referenced or out of scope  
+**Independent test:** Delete an in-scope vehicle and reject deletion when the vehicle is out of scope  
 **Acceptance scenarios:** see ### US-4.4 under Acceptance Criteria
 
 ## Requirements
@@ -58,10 +58,10 @@ Every story is P1: each one must ship for the assignment’s Vehicle Management 
 ### Functional Requirements
 
 * **FR-001:** Vehicle management MUST reuse Feature 1 authentication and role checks and the Area records from Feature 2. It MUST NOT add another sign-in flow or area screen.
-* **FR-002:** A vehicle MUST store make, model, year, vin, purchasedDate, color, passengers, plateNumber, plateExpireMonth, and areaId. The server MUST generate id. Request-body properties outside those fields MUST be ignored on create and update.
+* **FR-002:** A vehicle MUST store make, model, year, vin, purchasedDate, color, passengers, plateNumber, plateExpireMonth, designatedParking, and areaId. The server MUST generate id. Request-body properties outside those fields MUST be ignored on create and update.
 * **FR-003:** make and model MUST each be chosen from the standard lists in this spec. model MUST belong to the selected make. Values outside those lists MUST return 400.
 * **FR-004:** year MUST be an integer from 1980 through the current calendar year plus one. passengers MUST be an integer from 1 through 15. plateExpireMonth MUST be an integer from 1 through 12. purchasedDate MUST be a calendar date in `YYYY-MM-DD` form.
-* **FR-005:** vin, color, and plateNumber MUST be required nonblank strings after trimming outer spaces. vin MUST be stored uppercase, 1 to 17 letters or digits, and unique ignoring case. color and plateNumber MUST keep their letter case after outer trimming. plateNumber MUST be at most 20 characters.
+* **FR-005:** vin, color, plateNumber, and designatedParking MUST be required nonblank strings after trimming outer spaces. vin MUST be stored uppercase, 1 to 17 letters or digits, and unique ignoring case. color, plateNumber, and designatedParking MUST keep their letter case after outer trimming. plateNumber MUST be at most 20 characters. designatedParking MUST be at most 200 characters and is the vehicle’s pickup parking location for later day-before emails.
 * **FR-006:** areaId MUST be a positive integer for an existing Area. A missing area MUST return 404. An invalid areaId shape MUST return 400.
 * **FR-007:** An admin MUST list, create, update, and delete any vehicle. An area_admin MUST list, create, update, and delete only vehicles whose areaId equals that user’s current database areaId. Requestor and maintenance MUST receive the Feature 1 403 response for every vehicle-management endpoint. Signed-out requests MUST receive the Feature 1 401 response.
 * **FR-008:** Area scope MUST come from the current database user.areaId, not from URL queries, request bodies, token claims, or localStorage. An area_admin with null areaId MUST receive an empty list and MUST NOT create, update, or delete any vehicle.
@@ -69,7 +69,7 @@ Every story is P1: each one must ship for the assignment’s Vehicle Management 
 * **FR-010:** Vehicle lists for the caller’s allowed scope MUST sort by make ascending, then model ascending, then id ascending. An empty allowed result MUST be 200 with [].
 * **FR-011:** Duplicate vin on create or update MUST return 409 without changing data. Keeping the same vin on the same record MUST be allowed.
 * **FR-012:** PUT MUST replace the editable vehicle fields while preserving id. Route ids on PUT and DELETE MUST be positive safe integers; invalid ids MUST return 400 and missing or out-of-scope vehicles MUST return 404.
-* **FR-013:** DELETE MUST return 200 with message `Vehicle deleted.` when the vehicle is unused. If a later feature has linked the vehicle, DELETE MUST return 409 `Vehicle is in use.` and MUST NOT cascade. This feature MUST NOT create reservation, issue, or log tables.
+* **FR-013:** DELETE MUST return 200 with message `Vehicle deleted.` This feature MUST NOT create reservation, issue, or log tables.
 * **FR-014:** GET `/vehicle-t6/vehicles/options` MUST return the standard make list and the models for each make. Only admin and area_admin MAY call it.
 * **FR-015:** The Vehicles page MUST be available to admin and area_admin only. MenuBar MUST show Vehicles for those roles. Signed-out visitors MUST go to Login. Requestor and maintenance MUST be sent Home.
 * **FR-016:** Add and Edit MUST use dialogs with the documented fields, Save, and Cancel. Make and model MUST be combo boxes filled from the options endpoint. Area MUST be a combo box of areas from Feature 2; an area_admin’s area field MUST be fixed to its assigned area and MUST NOT offer other areas.
@@ -85,7 +85,7 @@ Every story is P1: each one must ship for the assignment’s Vehicle Management 
 * Admin manages the whole fleet. Area admin manages only vehicles for its one assigned area from Feature 2 / Feature 3.
 * Requestor and maintenance do not use this management screen. Feature 12 may later let maintenance read vehicles for logging.
 * VIN is the unique fleet identity. Plate numbers are required but are not unique in this feature.
-* Deleting a vehicle is blocked only when another feature has already linked that vehicle. This feature does not invent those link tables.
+* designatedParking is stored here so Feature 9 can name the parking spot in the day-before email. This feature does not send that email.
 
 ## Edge Cases
 
@@ -111,13 +111,13 @@ Every story is P1: each one must ship for the assignment’s Vehicle Management 
 | Options | Allowed | Allowed | 403 |
 | Create | Any existing area | Own area only | 403 |
 | Update | Any existing vehicle | Own-area vehicle only; otherwise 404 | 403 |
-| Delete | Unused vehicles | Unused own-area vehicles; otherwise 404 | 403 |
+| Delete | Any vehicle | Own-area vehicle only; otherwise 404 | 403 |
 
 Authentication and roles come from [Feature 1](feature-1-user-authentication-authorization.md). Areas come from [Feature 2](feature-2-area-management.md). No client-supplied role or area claim expands those permissions.
 
 ## Key Entities
 
-* **Vehicle:** one OC fleet unit with make, model, year, VIN, purchase date, color, passenger count, plate data, and one assigned Area.
+* **Vehicle:** one OC fleet unit with make, model, year, VIN, purchase date, color, passenger count, plate data, designated parking, and one assigned Area.
 * **Standard make/model lists:** the fixed combo-box values this feature validates and returns from the options endpoint.
 
 ## Standard make and model lists
@@ -147,7 +147,7 @@ All endpoints reuse [Feature 1](feature-1-user-authentication-authorization.md) 
 | GET | `/vehicle-t6/vehicles` | admin, area_admin | `200`, array of Vehicle objects in the caller’s scope |
 | POST | `/vehicle-t6/vehicles` | admin, area_admin | `201`, new Vehicle object |
 | PUT | `/vehicle-t6/vehicles/:id` | admin, or area_admin for an in-scope vehicle | `200`, updated Vehicle object |
-| DELETE | `/vehicle-t6/vehicles/:id` | admin, or area_admin for an in-scope unused vehicle | `200`, `{ "message": "Vehicle deleted." }` |
+| DELETE | `/vehicle-t6/vehicles/:id` | admin, or area_admin for an in-scope vehicle | `200`, `{ "message": "Vehicle deleted." }` |
 
 POST/PUT body:
 
@@ -162,6 +162,7 @@ POST/PUT body:
   "passengers": 12,
   "plateNumber": "OC-4521",
   "plateExpireMonth": 8,
+  "designatedParking": "Support Central lot, spot B3",
   "areaId": 1
 }
 ```
@@ -176,15 +177,14 @@ Vehicle object: the body fields above plus generated `id`. `vin` is returned upp
 | Missing area on create/update | 404 | `Area with id=<id> not found.` |
 | Missing or out-of-scope vehicle | 404 | `Vehicle with id=<id> not found.` |
 | Duplicate VIN | 409 | `VIN is already in use.` |
-| Referenced vehicle | 409 | `Vehicle is in use.` |
 | Other database failure | 500 | `Vehicle request failed.` |
 
 ## Screen Requirements
 
 * `/vehicles`, route name `vehicles`, heading **Vehicles**. MenuBar shows **Vehicles** for admin and area_admin only. Signed-out users follow Feature 1 Login redirect. Requestor and maintenance are sent Home.
-* List columns: **Make**, **Model**, **Year**, **Color**, **Passengers**, **Plate**, **Plate expires**, **Area**, and permitted **Actions**. Area shows the Feature 2 area name for `areaId`. The page uses only server-returned records.
+* List columns: **Make**, **Model**, **Year**, **Color**, **Passengers**, **Plate**, **Plate expires**, **Parking**, **Area**, and permitted **Actions**. Area shows the Feature 2 area name for `areaId`. The page uses only server-returned records.
 * Admin and area_admin see **Add vehicle**, **Edit**, and **Delete** on rows in their allowed scope. An area_admin does not see other areas’ vehicles.
-* Add/edit dialogs: **Add vehicle** or **Edit vehicle**; fields **Make**, **Model**, **Year**, **VIN**, **Purchased date**, **Color**, **Passengers**, **Plate number**, **Plate expire month**, and **Area**; buttons **Save** and **Cancel**. Make and model are combo boxes from `/vehicles/options`. Model options follow the selected make. Area options come from Feature 2; an area_admin’s Area control is fixed to its assigned area. Edit starts with the chosen row’s values. The client applies the same validity rules and uses `Invalid vehicle data.` when invalid.
+* Add/edit dialogs: **Add vehicle** or **Edit vehicle**; fields **Make**, **Model**, **Year**, **VIN**, **Purchased date**, **Color**, **Passengers**, **Plate number**, **Plate expire month**, **Designated parking**, and **Area**; buttons **Save** and **Cancel**. Make and model are combo boxes from `/vehicles/options`. Model options follow the selected make. Area options come from Feature 2; an area_admin’s Area control is fixed to its assigned area. Edit starts with the chosen row’s values. The client applies the same validity rules and uses `Invalid vehicle data.` when invalid.
 * A pending save shows progress and disables repeated Save. Success closes the dialog and reloads the list. Failure keeps the values and shows the API message or `Vehicle could not be saved.`. Cancel sends no write and discards values and errors.
 * **Delete vehicle** confirmation asks `Delete this vehicle?` and offers **Delete** and **Cancel**. Pending deletion suppresses resubmission. Failure keeps the dialog and row and shows the API message or `Vehicle could not be deleted.`; success closes it and refreshes the list.
 * The list shows progress while loading and `No vehicles found.` only after a successful empty result. Load failure shows the API message or `Vehicles could not be loaded.` and no empty-state message.
@@ -205,6 +205,7 @@ Add `vehicles`:
 | passengers | Integer | Required; 1 through 15 |
 | plateNumber | String(20) | Required; trimmed; nonblank; case kept |
 | plateExpireMonth | Integer | Required; 1 through 12 |
+| designatedParking | String(200) | Required; trimmed; nonblank; case kept; pickup parking location |
 | areaId | Integer | Required foreign key to `areas.id`, `ON DELETE RESTRICT` |
 
 Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. This feature does not add mileage, service, issue, or reservation tables.
@@ -251,7 +252,7 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 #### Scenario: Vehicles page shows allowed records and actions
 * **Given** GET /vehicles returns the caller’s allowed vehicles
 * **When** an admin or area_admin opens /vehicles from MenuBar
-* **Then** each allowed vehicle appears with make, model, year, color, passengers, plate, plate expire month, and area name, and Add vehicle, Edit, and Delete are available
+* **Then** each allowed vehicle appears with make, model, year, color, passengers, plate, plate expire month, designated parking, and area name, and Add vehicle, Edit, and Delete are available
 
 #### Scenario: Vehicles navigation requires an allowed role
 * **Given** a signed-out visitor opens /vehicles
@@ -296,9 +297,9 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 * **Then** the response is 403 with the Feature 1 Forbidden. message and no vehicle is created
 
 #### Scenario: Vehicle string values trim outer spaces
-* **Given** an admin surrounds a valid vin, color, and plateNumber with spaces
+* **Given** an admin surrounds a valid vin, color, plateNumber, and designatedParking with spaces
 * **When** the vehicle is created
-* **Then** outer spaces are removed, vin is stored uppercase, and color and plateNumber keep their letter case
+* **Then** outer spaces are removed, vin is stored uppercase, and color, plateNumber, and designatedParking keep their letter case
 
 #### Scenario: Duplicate VIN is rejected
 * **Given** a vehicle with vin 1FTBR1C80MKA12345 exists
@@ -328,7 +329,7 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 #### Scenario: Add vehicle opens the specified form
 * **Given** an admin is on Vehicles
 * **When** the admin selects Add vehicle
-* **Then** the Add vehicle dialog shows Make, Model, Year, VIN, Purchased date, Color, Passengers, Plate number, Plate expire month, Area, Save, and Cancel
+* **Then** the Add vehicle dialog shows Make, Model, Year, VIN, Purchased date, Color, Passengers, Plate number, Plate expire month, Designated parking, Area, Save, and Cancel
 
 #### Scenario: Saving a vehicle updates the list
 * **Given** valid vehicle fields are entered and POST succeeds
@@ -379,8 +380,8 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 
 #### Scenario: Invalid vehicle route id is rejected
 * **Given** an admin is signed in
-* **When** PUT or DELETE is sent with route id abc
-* **Then** the response is 400 with message Vehicle id must be a positive integer.
+* **When** PUT or DELETE is sent with route id abc, 0, -1, or an unsafe integer
+* **Then** each response is 400 with message Vehicle id must be a positive integer.
 
 #### Scenario: Edit vehicle opens with the current values
 * **Given** an allowed vehicle row is shown on Vehicles
@@ -395,12 +396,12 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 ### US-4.4 — Delete a vehicle
 
 #### Scenario: Admin deletes an unused vehicle
-* **Given** vehicle id 3 exists and is not referenced
+* **Given** vehicle id 3 exists
 * **When** an admin sends DELETE /vehicle-t6/vehicles/3
 * **Then** the response is 200 with message Vehicle deleted. and the vehicle is gone
 
 #### Scenario: Area admin deletes an unused vehicle in its area
-* **Given** an area_admin has areaId 2 and vehicle id 5 belongs to area 2 and is unused
+* **Given** an area_admin has areaId 2 and vehicle id 5 belongs to area 2
 * **When** that user sends DELETE /vehicle-t6/vehicles/5
 * **Then** the response is 200 with message Vehicle deleted.
 
@@ -414,17 +415,12 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 * **When** an admin sends DELETE /vehicle-t6/vehicles/9999
 * **Then** the response is 404 with message Vehicle with id=9999 not found.
 
-#### Scenario: Deleting a referenced vehicle is rejected
-* **Given** vehicle id 3 is referenced by a later feature link
-* **When** an admin sends DELETE /vehicle-t6/vehicles/3
-* **Then** the response is 409 with message Vehicle is in use. and the vehicle remains
-
 #### Scenario: Delete vehicle requires confirmation
 * **Given** an allowed vehicle row is shown on Vehicles
 * **When** the user selects Delete
 * **Then** a Delete vehicle dialog asks Delete this vehicle? and offers Delete and Cancel
 
-#### Scenario: Confirmed deletion refreshes the list
+#### Scenario: Confirmed vehicle deletion refreshes the list
 * **Given** the delete confirmation is open and DELETE succeeds
 * **When** the user selects Delete
 * **Then** the dialog shows progress while pending, closes on success, and reloads the allowed list
@@ -441,52 +437,51 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 
 ## Test Coverage Map
 
-Exact `it(...)` titles. Backend file: `backend/tests/vehicle.test.js`. Frontend file: `frontend/tests/Vehicles.test.js`.
+Exact `it(...)` titles. Backend file: `backend/tests/vehicles.test.js`. Frontend file: `frontend/tests/Vehicles.test.js`.
 
 | Story | Scenario | File | Exact test name |
 |-------|----------|------|-----------------|
-| US-4.1 | Admin lists every vehicle in make and model order | `backend/tests/vehicle.test.js` | `it("Admin lists every vehicle in make and model order")` |
-| US-4.1 | Area admin lists only vehicles for its area | `backend/tests/vehicle.test.js` | `it("Area admin lists only vehicles for its area")` |
-| US-4.1 | Area admin without an assignment gets an empty list | `backend/tests/vehicle.test.js` | `it("Area admin without an assignment gets an empty list")` |
-| US-4.1 | Empty vehicle list is returned | `backend/tests/vehicle.test.js` | `it("Empty vehicle list is returned")` |
-| US-4.1 | Requestor and maintenance cannot list vehicles | `backend/tests/vehicle.test.js` | `it("Requestor and maintenance cannot list vehicles")` |
-| US-4.1 | Vehicle API requires a session | `backend/tests/vehicle.test.js` | `it("Vehicle API requires a session")` |
-| US-4.1 | Options returns the standard make and model lists | `backend/tests/vehicle.test.js` | `it("Options returns the standard make and model lists")` |
+| US-4.1 | Admin lists every vehicle in make and model order | `backend/tests/vehicles.test.js` | `it("Admin lists every vehicle in make and model order")` |
+| US-4.1 | Area admin lists only vehicles for its area | `backend/tests/vehicles.test.js` | `it("Area admin lists only vehicles for its area")` |
+| US-4.1 | Area admin without an assignment gets an empty list | `backend/tests/vehicles.test.js` | `it("Area admin without an assignment gets an empty list")` |
+| US-4.1 | Empty vehicle list is returned | `backend/tests/vehicles.test.js` | `it("Empty vehicle list is returned")` |
+| US-4.1 | Requestor and maintenance cannot list vehicles | `backend/tests/vehicles.test.js` | `it("Requestor and maintenance cannot list vehicles")` |
+| US-4.1 | Vehicle API requires a session | `backend/tests/vehicles.test.js` | `it("Vehicle API requires a session")` |
+| US-4.1 | Options returns the standard make and model lists | `backend/tests/vehicles.test.js` | `it("Options returns the standard make and model lists")` |
 | US-4.1 | Vehicles page shows allowed records and actions | `frontend/tests/Vehicles.test.js` | `it("Vehicles page shows allowed records and actions")` |
 | US-4.1 | Vehicles navigation requires an allowed role | `frontend/tests/Vehicles.test.js` | `it("Vehicles navigation requires an allowed role")` |
 | US-4.1 | Requestor and maintenance are sent Home from Vehicles | `frontend/tests/Vehicles.test.js` | `it("Requestor and maintenance are sent Home from Vehicles")` |
 | US-4.1 | Vehicles page distinguishes loading empty and failed states | `frontend/tests/Vehicles.test.js` | `it("Vehicles page distinguishes loading empty and failed states")` |
 | US-4.1 | Vehicle list failure does not show an empty list | `frontend/tests/Vehicles.test.js` | `it("Vehicle list failure does not show an empty list")` |
-| US-4.2 | Admin creates a vehicle | `backend/tests/vehicle.test.js` | `it("Admin creates a vehicle")` |
-| US-4.2 | Area admin creates a vehicle for its own area | `backend/tests/vehicle.test.js` | `it("Area admin creates a vehicle for its own area")` |
-| US-4.2 | Area admin cannot create a vehicle for another area | `backend/tests/vehicle.test.js` | `it("Area admin cannot create a vehicle for another area")` |
-| US-4.2 | Area admin without an assignment cannot create a vehicle | `backend/tests/vehicle.test.js` | `it("Area admin without an assignment cannot create a vehicle")` |
-| US-4.2 | Vehicle string values trim outer spaces | `backend/tests/vehicle.test.js` | `it("Vehicle string values trim outer spaces")` |
-| US-4.2 | Duplicate VIN is rejected | `backend/tests/vehicle.test.js` | `it("Duplicate VIN is rejected")` |
-| US-4.2 | Unknown make or model is rejected | `backend/tests/vehicle.test.js` | `it("Unknown make or model is rejected")` |
-| US-4.2 | Missing area is rejected | `backend/tests/vehicle.test.js` | `it("Missing area is rejected")` |
-| US-4.2 | Requestor and maintenance cannot create a vehicle | `backend/tests/vehicle.test.js` | `it("Requestor and maintenance cannot create a vehicle")` |
-| US-4.2 | Client cannot select a vehicle primary key | `backend/tests/vehicle.test.js` | `it("Client cannot select a vehicle primary key")` |
+| US-4.2 | Admin creates a vehicle | `backend/tests/vehicles.test.js` | `it("Admin creates a vehicle")` |
+| US-4.2 | Area admin creates a vehicle for its own area | `backend/tests/vehicles.test.js` | `it("Area admin creates a vehicle for its own area")` |
+| US-4.2 | Area admin cannot create a vehicle for another area | `backend/tests/vehicles.test.js` | `it("Area admin cannot create a vehicle for another area")` |
+| US-4.2 | Area admin without an assignment cannot create a vehicle | `backend/tests/vehicles.test.js` | `it("Area admin without an assignment cannot create a vehicle")` |
+| US-4.2 | Vehicle string values trim outer spaces | `backend/tests/vehicles.test.js` | `it("Vehicle string values trim outer spaces")` |
+| US-4.2 | Duplicate VIN is rejected | `backend/tests/vehicles.test.js` | `it("Duplicate VIN is rejected")` |
+| US-4.2 | Unknown make or model is rejected | `backend/tests/vehicles.test.js` | `it("Unknown make or model is rejected")` |
+| US-4.2 | Missing area is rejected | `backend/tests/vehicles.test.js` | `it("Missing area is rejected")` |
+| US-4.2 | Requestor and maintenance cannot create a vehicle | `backend/tests/vehicles.test.js` | `it("Requestor and maintenance cannot create a vehicle")` |
+| US-4.2 | Client cannot select a vehicle primary key | `backend/tests/vehicles.test.js` | `it("Client cannot select a vehicle primary key")` |
 | US-4.2 | Add vehicle opens the specified form | `frontend/tests/Vehicles.test.js` | `it("Add vehicle opens the specified form")` |
 | US-4.2 | Saving a vehicle updates the list | `frontend/tests/Vehicles.test.js` | `it("Saving a vehicle updates the list")` |
 | US-4.2 | Cancel leaves vehicle records unchanged | `frontend/tests/Vehicles.test.js` | `it("Cancel leaves vehicle records unchanged")` |
 | US-4.2 | Vehicle form rejects invalid fields before submitting | `frontend/tests/Vehicles.test.js` | `it("Vehicle form rejects invalid fields before submitting")` |
 | US-4.2 | Failed vehicle save keeps the dialog open | `frontend/tests/Vehicles.test.js` | `it("Failed vehicle save keeps the dialog open")` |
-| US-4.3 | Admin updates a vehicle | `backend/tests/vehicle.test.js` | `it("Admin updates a vehicle")` |
-| US-4.3 | Area admin updates a vehicle in its area | `backend/tests/vehicle.test.js` | `it("Area admin updates a vehicle in its area")` |
-| US-4.3 | Area admin cannot update a vehicle in another area | `backend/tests/vehicle.test.js` | `it("Area admin cannot update a vehicle in another area")` |
-| US-4.3 | Area admin cannot move a vehicle to another area | `backend/tests/vehicle.test.js` | `it("Area admin cannot move a vehicle to another area")` |
-| US-4.3 | Updating a missing vehicle is rejected | `backend/tests/vehicle.test.js` | `it("Updating a missing vehicle is rejected")` |
-| US-4.3 | Invalid vehicle route id is rejected | `backend/tests/vehicle.test.js` | `it("Invalid vehicle route id is rejected")` |
+| US-4.3 | Admin updates a vehicle | `backend/tests/vehicles.test.js` | `it("Admin updates a vehicle")` |
+| US-4.3 | Area admin updates a vehicle in its area | `backend/tests/vehicles.test.js` | `it("Area admin updates a vehicle in its area")` |
+| US-4.3 | Area admin cannot update a vehicle in another area | `backend/tests/vehicles.test.js` | `it("Area admin cannot update a vehicle in another area")` |
+| US-4.3 | Area admin cannot move a vehicle to another area | `backend/tests/vehicles.test.js` | `it("Area admin cannot move a vehicle to another area")` |
+| US-4.3 | Updating a missing vehicle is rejected | `backend/tests/vehicles.test.js` | `it("Updating a missing vehicle is rejected")` |
+| US-4.3 | Invalid vehicle route id is rejected | `backend/tests/vehicles.test.js` | `it("Invalid vehicle route id is rejected")` |
 | US-4.3 | Edit vehicle opens with the current values | `frontend/tests/Vehicles.test.js` | `it("Edit vehicle opens with the current values")` |
 | US-4.3 | Saving an edited vehicle refreshes the list | `frontend/tests/Vehicles.test.js` | `it("Saving an edited vehicle refreshes the list")` |
-| US-4.4 | Admin deletes an unused vehicle | `backend/tests/vehicle.test.js` | `it("Admin deletes an unused vehicle")` |
-| US-4.4 | Area admin deletes an unused vehicle in its area | `backend/tests/vehicle.test.js` | `it("Area admin deletes an unused vehicle in its area")` |
-| US-4.4 | Area admin cannot delete a vehicle in another area | `backend/tests/vehicle.test.js` | `it("Area admin cannot delete a vehicle in another area")` |
-| US-4.4 | Deleting a missing vehicle is rejected | `backend/tests/vehicle.test.js` | `it("Deleting a missing vehicle is rejected")` |
-| US-4.4 | Deleting a referenced vehicle is rejected | `backend/tests/vehicle.test.js` | `it("Deleting a referenced vehicle is rejected")` |
+| US-4.4 | Admin deletes an unused vehicle | `backend/tests/vehicles.test.js` | `it("Admin deletes an unused vehicle")` |
+| US-4.4 | Area admin deletes an unused vehicle in its area | `backend/tests/vehicles.test.js` | `it("Area admin deletes an unused vehicle in its area")` |
+| US-4.4 | Area admin cannot delete a vehicle in another area | `backend/tests/vehicles.test.js` | `it("Area admin cannot delete a vehicle in another area")` |
+| US-4.4 | Deleting a missing vehicle is rejected | `backend/tests/vehicles.test.js` | `it("Deleting a missing vehicle is rejected")` |
 | US-4.4 | Delete vehicle requires confirmation | `frontend/tests/Vehicles.test.js` | `it("Delete vehicle requires confirmation")` |
-| US-4.4 | Confirmed deletion refreshes the list | `frontend/tests/Vehicles.test.js` | `it("Confirmed deletion refreshes the list")` |
+| US-4.4 | Confirmed vehicle deletion refreshes the list | `frontend/tests/Vehicles.test.js` | `it("Confirmed vehicle deletion refreshes the list")` |
 | US-4.4 | Failed vehicle deletion preserves the dialog and row | `frontend/tests/Vehicles.test.js` | `it("Failed vehicle deletion preserves the dialog and row")` |
 | US-4.4 | Cancel closes delete without a request | `frontend/tests/Vehicles.test.js` | `it("Cancel closes delete without a request")` |
 
@@ -523,6 +518,7 @@ Do not implement behavior not in this spec.
 * Google sign-in and roles: [Feature 1](feature-1-user-authentication-authorization.md).
 * Creating or editing areas: [Feature 2](feature-2-area-management.md).
 * Assigning users to areas: [Feature 3 — User Management in the catalog](README.md#feature-catalog).
+* Approved drivers (first/last name, license state, license expire date, approved date, status): [Feature 5 — Driver Management in the catalog](README.md#feature-catalog). The interview lists drivers near vehicles, but drivers are their own feature.
 * Assigning a vehicle to a reservation request: [Feature 8 — Request Processing in the catalog](README.md#feature-catalog).
 * Issue reports such as low gas, dirty, or maintenance need: [Feature 10 — Vehicle Issue Reports in the catalog](README.md#feature-catalog).
 * Weekly schedule views: [Feature 11 — Weekly Vehicle Schedule in the catalog](README.md#feature-catalog).
