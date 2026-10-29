@@ -5,7 +5,7 @@
 **Status:** Ready  
 **Created:** 2026-10-27  
 **Input:** Let a requestor report Low gas, Dirty, or Maintenance need on a reservation request before, during, or after the trip, and let admin, area admin, and maintenance view the issue lists they are allowed to see.  
-**Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests in the catalog](README.md#feature-catalog), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
+**Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests](feature-7-reservation-requests.md), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
 
 ---
 
