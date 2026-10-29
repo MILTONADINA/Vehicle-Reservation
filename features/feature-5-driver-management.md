@@ -394,7 +394,7 @@ Register the Driver model in `models/index.js`. This feature does not add a fore
 * **When** the delete request finishes
 * **Then** the dialog and row remain and the page shows the API message or Driver could not be deleted.
 
-#### Scenario: Cancel closes delete without a request
+#### Scenario: Cancel closes driver delete without a request
 * **Given** the delete confirmation is open
 * **When** the user selects Cancel
 * **Then** no delete request is sent and the driver remains on the list
@@ -445,7 +445,7 @@ Exact `it(...)` titles. Backend file: `backend/tests/drivers.test.js`. Frontend 
 | US-5.4 | Delete driver requires confirmation | `frontend/tests/Drivers.test.js` | `it("Delete driver requires confirmation")` |
 | US-5.4 | Confirmed driver deletion refreshes the list | `frontend/tests/Drivers.test.js` | `it("Confirmed driver deletion refreshes the list")` |
 | US-5.4 | Failed driver deletion preserves the dialog and row | `frontend/tests/Drivers.test.js` | `it("Failed driver deletion preserves the dialog and row")` |
-| US-5.4 | Cancel closes delete without a request | `frontend/tests/Drivers.test.js` | `it("Cancel closes delete without a request")` |
+| US-5.4 | Cancel closes driver delete without a request | `frontend/tests/Drivers.test.js` | `it("Cancel closes driver delete without a request")` |
 
 ## Agent implementation request
 
