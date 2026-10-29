@@ -5,7 +5,7 @@
 **Status:** Ready  
 **Created:** 2026-10-28  
 **Input:** Give admins and area admins a weekly calendar of reservation requests with status and vehicle, plus a service queue of requests that still need a vehicle or need check-in after the trip.  
-**Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests in the catalog](README.md#feature-catalog), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
+**Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests](feature-7-reservation-requests.md), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
 
 ---
 
