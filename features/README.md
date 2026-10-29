@@ -25,7 +25,7 @@ No application code may be written unless it maps to a requirement in one of the
 | 7 | Reservation Requests | [feature-7-reservation-requests.md](./feature-7-reservation-requests.md) | `feature/7-reservation-requests` | 1, 2, 5, 6 | Morgan | Landry |
 | 8 | Request Processing | [feature-8-request-processing.md](./feature-8-request-processing.md) | `feature/8-request-processing` | 4, 7 | Morgan | Landry |
 | 9 | Reservation Emails | *not yet written* | `feature/9-reservation-emails` | 2, 4, 8 | Milton | Morgan |
-| 10 | Vehicle Issue Reports | *not yet written* | `feature/10-vehicle-issue-reports` | 4, 8 | Landry | Milton |
+| 10 | Vehicle Issue Reports | [feature-10-vehicle-issue-reports.md](./feature-10-vehicle-issue-reports.md) | `feature/10-vehicle-issue-reports` | 4, 7, 8 | Landry | Milton |
 | 11 | Weekly Vehicle Schedule | *not yet written* | `feature/11-weekly-vehicle-schedule` | 4, 8 | Landry | Milton |
 | 12 | Mileage & Service Logs | [feature-12-mileage-service-logs.md](./feature-12-mileage-service-logs.md) | `feature/12-mileage-service-logs` | 4 | Landry | Milton |
 
