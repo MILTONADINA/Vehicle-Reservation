@@ -18,7 +18,9 @@ async function check() {
     return;
   }
   const startedFor = route.fullPath;
-  const stillCurrent = () => route.fullPath === startedFor && !!route.meta.requiresAuth && !!Utils.getStore("user")?.token;
+  const startedWithToken = Utils.getStore("user")?.token;
+  const stillCurrent = () =>
+    route.fullPath === startedFor && !!route.meta.requiresAuth && !!startedWithToken && Utils.getStore("user")?.token === startedWithToken;
   state.value = "checking";
   try {
     const result = await AuthServices.me();
