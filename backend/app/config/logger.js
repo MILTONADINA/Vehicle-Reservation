@@ -12,13 +12,17 @@ const format = winston.format.combine(
   winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)
 );
 
-const transports = [
-  new winston.transports.Console({
-    format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
-  }),
-  new DailyRotateFile({ filename: "logs/error-%DATE%.log", datePattern: "YYYY-MM-DD", level: "error" }),
-  new DailyRotateFile({ filename: "logs/all-%DATE%.log", datePattern: "YYYY-MM-DD" }),
-];
+// Tests exercise failure paths on purpose; their expected warnings stay out of the test output and log files.
+const transports =
+  process.env.NODE_ENV === "test"
+    ? [new winston.transports.Console({ silent: true })]
+    : [
+        new winston.transports.Console({
+          format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+        }),
+        new DailyRotateFile({ filename: "logs/error-%DATE%.log", datePattern: "YYYY-MM-DD", level: "error" }),
+        new DailyRotateFile({ filename: "logs/all-%DATE%.log", datePattern: "YYYY-MM-DD" }),
+      ];
 
 const logger = winston.createLogger({ level: level(), levels, format, transports });
 logger.stream = { write: (message) => logger.http(message.trim()) };
