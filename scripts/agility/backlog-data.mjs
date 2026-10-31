@@ -69,16 +69,18 @@ export function parseUserStories(content) {
   const stories = [];
   // Allow a blank line after the heading (standard markdown in feature specs).
   const storyRegex =
-    /### US-\d+\.(\d+):\s*([^\n]+)\r?\n+\*\*As (?:a|the)\*\*\s*([^\n]+)\r?\n\*\*I want(?: to)?\*\*\s*([^\n]+)\r?\n\*\*So that\*\*\s*([^\n]+)/g;
+    /### US-\d+\.(\d+):\s*([^\n]+)\r?\n+\*\*As (a|the)\*\*\s*([^\n]+)\r?\n\*\*I want( to)?\*\*\s*([^\n]+)\r?\n\*\*So that\*\*\s*([^\n]+)/g;
 
   let match;
   while ((match = storyRegex.exec(content)) !== null) {
     stories.push({
       num: match[1],
       title: match[2].trim(),
-      asA: match[3].trim(),
-      iWant: match[4].trim(),
-      soThat: match[5].trim(),
+      article: match[3],
+      asA: match[4].trim(),
+      wantsTo: Boolean(match[5]),
+      iWant: match[6].trim(),
+      soThat: match[7].trim(),
     });
   }
 
@@ -173,8 +175,8 @@ export function formatExpectedResults(scenario) {
 
 function storyDescription(story, feature, ref) {
   return [
-    `As a/the ${story.asA}`,
-    `I want ${story.iWant}`,
+    `As ${story.article} ${story.asA}`,
+    `I want${story.wantsTo ? " to" : ""} ${story.iWant}`,
     `So that ${story.soThat}`,
     "",
     `Spec: ${feature.file}`,
