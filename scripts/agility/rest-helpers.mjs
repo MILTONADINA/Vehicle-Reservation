@@ -17,10 +17,19 @@ function extractAttributeValue(block, attrName) {
   return tagMatch?.[1]?.trim() ?? "";
 }
 
+function unescapeXml(text) {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 /**
  * @param {string} xmlText REST XML response body
  * @param {string} assetType e.g. "Story", "Test", "Epic"
- * @returns {{ oid: string, name: string, reference: string }[]}
+ * @returns {{ oid: string, name: string, reference: string, description: string, expectedResults: string }[]}
  */
 export function parseRestAssetList(xmlText, assetType) {
   const assets = [];
@@ -44,6 +53,8 @@ export function parseRestAssetList(xmlText, assetType) {
       oid,
       name: extractAttributeValue(body, "Name"),
       reference: extractAttributeValue(body, "Reference"),
+      description: unescapeXml(extractAttributeValue(body, "Description")),
+      expectedResults: unescapeXml(extractAttributeValue(body, "ExpectedResults")),
     });
   }
 
@@ -76,10 +87,13 @@ export function findAssetByRefOrName(assets, { ref, name }) {
  * @param {(path: string) => Promise<{ ok: boolean, status: number, text: string }>} restGet
  * @param {string} assetType
  * @param {string} where
+ * @param {string[]} extraSel additional attributes to read (e.g. Description) for change detection
  */
-export async function listAssetsWhere(restGet, assetType, where) {
+export async function listAssetsWhere(restGet, assetType, where, extraSel = []) {
+  // page=<size>,<start>: read every matching asset, not a single one.
+  const sel = ["Name", "Reference", ...extraSel].join(",");
   const { ok, status, text } = await restGet(
-    `/rest-1.v1/Data/${assetType}?sel=Name,Reference&where=${encodeURIComponent(where)}&page=1,0`,
+    `/rest-1.v1/Data/${assetType}?sel=${sel}&where=${encodeURIComponent(where)}&page=1000,0`,
   );
 
   if (!ok) {
@@ -95,12 +109,12 @@ export async function listAssetsWhere(restGet, assetType, where) {
  * @param {string} assetType
  * @param {string} parentOid
  */
-export async function listChildAssets(restGet, assetType, parentOid) {
+export async function listChildAssets(restGet, assetType, parentOid, extraSel = []) {
   const parentClause = `Parent='${parentOid}'`;
-  const parentAssets = await listAssetsWhere(restGet, assetType, parentClause);
+  const parentAssets = await listAssetsWhere(restGet, assetType, parentClause, extraSel);
   if (parentAssets.length > 0) {
     return parentAssets;
   }
 
-  return listAssetsWhere(restGet, assetType, `Super='${parentOid}'`);
+  return listAssetsWhere(restGet, assetType, `Super='${parentOid}'`, extraSel);
 }

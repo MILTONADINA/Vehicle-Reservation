@@ -34,8 +34,10 @@ function emptyUpsertPlan() {
   return {
     storiesToCreate: [],
     storiesToUpdate: [],
+    storiesUnchanged: [],
     testsToCreate: [],
     testsToUpdate: [],
+    testsUnchanged: [],
     payloads: [],
   };
 }
@@ -49,7 +51,7 @@ function emptyUpsertPlan() {
  */
 export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet) {
   const plan = emptyUpsertPlan();
-  const existingStories = await listAssetsWhere(restGet, "Story", `Super='${epicOid}'`);
+  const existingStories = await listAssetsWhere(restGet, "Story", `Super='${epicOid}'`, ["Description"]);
 
   for (const story of feature.stories) {
     const existingStory = findAssetByRefOrName(existingStories, {
@@ -58,13 +60,17 @@ export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet
     });
 
     if (existingStory) {
-      plan.storiesToUpdate.push({ oid: existingStory.oid, name: story.name, ref: story.ref });
-      plan.payloads.push({
-        from: existingStory.oid,
-        update: { Description: story.description },
-      });
+      if (existingStory.description === story.description) {
+        plan.storiesUnchanged.push({ oid: existingStory.oid, name: story.name, ref: story.ref });
+      } else {
+        plan.storiesToUpdate.push({ oid: existingStory.oid, name: story.name, ref: story.ref });
+        plan.payloads.push({
+          from: existingStory.oid,
+          update: { Description: story.description },
+        });
+      }
 
-      const existingTests = await listChildAssets(restGet, "Test", existingStory.oid);
+      const existingTests = await listChildAssets(restGet, "Test", existingStory.oid, ["Description", "ExpectedResults"]);
 
       for (const test of story.tests) {
         const existingTest = findAssetByRefOrName(existingTests, {
@@ -73,14 +79,18 @@ export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet
         });
 
         if (existingTest) {
-          plan.testsToUpdate.push({ oid: existingTest.oid, name: test.name, ref: test.ref });
-          plan.payloads.push({
-            from: existingTest.oid,
-            update: {
-              Description: test.description,
-              ExpectedResults: test.expectedResults,
-            },
-          });
+          if (existingTest.description === test.description && existingTest.expectedResults === test.expectedResults) {
+            plan.testsUnchanged.push({ oid: existingTest.oid, name: test.name, ref: test.ref });
+          } else {
+            plan.testsToUpdate.push({ oid: existingTest.oid, name: test.name, ref: test.ref });
+            plan.payloads.push({
+              from: existingTest.oid,
+              update: {
+                Description: test.description,
+                ExpectedResults: test.expectedResults,
+              },
+            });
+          }
         } else {
           plan.testsToCreate.push({ storyOid: existingStory.oid, name: test.name, ref: test.ref });
           plan.payloads.push(buildTestCreatePayload(scopeRef, existingStory.oid, test));
@@ -99,8 +109,10 @@ export function formatUpsertPlanSummary(plan) {
   return {
     storiesCreate: plan.storiesToCreate.length,
     storiesUpdate: plan.storiesToUpdate.length,
+    storiesUnchanged: plan.storiesUnchanged.length,
     testsCreate: plan.testsToCreate.length,
     testsUpdate: plan.testsToUpdate.length,
+    testsUnchanged: plan.testsUnchanged.length,
     operations: plan.payloads.length,
   };
 }
@@ -110,7 +122,7 @@ export function printUpsertPlan(feature, plan) {
   console.log(`Feature ${feature.num} — ${feature.epic.name}`);
   console.log(
     `  Plan: ${summary.storiesCreate} story create, ${summary.storiesUpdate} story update, ` +
-      `${summary.testsCreate} test create, ${summary.testsUpdate} test update ` +
+      `${summary.testsCreate} test create, ${summary.testsUpdate} test update, ${summary.storiesUnchanged + summary.testsUnchanged} unchanged ` +
       `(${summary.operations} API operation(s))`,
   );
   console.log("");
