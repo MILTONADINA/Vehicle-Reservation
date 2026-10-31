@@ -1,10 +1,48 @@
 <script setup>
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import MenuBar from "./components/MenuBar.vue";
+import SessionGate from "./components/SessionGate.vue";
+import Utils from "./config/utils.js";
+
+const route = useRoute();
+const user = ref(Utils.getStore("user"));
+const forbidden = ref("");
+const showMenu = computed(() => !!route.meta.requiresAuth && !!user.value?.token);
+
+// Refresh the layout when auth state changes (frontend-services.mdc: cross-component events).
+const refreshUser = () => { user.value = Utils.getStore("user"); };
+const showForbidden = (event) => { forbidden.value = event.detail || "Forbidden."; };
+// A denial belongs to the screen it happened on.
+watch(() => route.fullPath, () => { forbidden.value = ""; });
+onMounted(() => {
+  window.addEventListener("user-logged-in", refreshUser);
+  window.addEventListener("user-logged-out", refreshUser);
+  window.addEventListener("api-forbidden", showForbidden);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("user-logged-in", refreshUser);
+  window.removeEventListener("user-logged-out", refreshUser);
+  window.removeEventListener("api-forbidden", showForbidden);
+});
 </script>
 
 <template>
   <v-app>
+    <MenuBar v-if="showMenu" />
     <v-main>
-      <router-view />
+      <v-alert
+        v-if="forbidden"
+        type="error"
+        density="compact"
+        class="ma-4"
+        closable
+        data-testid="forbidden-alert"
+        @click:close="forbidden = ''"
+      >{{ forbidden }}</v-alert>
+      <SessionGate>
+        <router-view />
+      </SessionGate>
     </v-main>
   </v-app>
 </template>

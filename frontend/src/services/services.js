@@ -21,20 +21,26 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const message = error.response?.data?.message || "";
+// A 401 ends the local session; a 403 on a protected request is announced to the layout without
+// signing out. The login request reports its own failures on the Login screen.
+export function handleResponseError(error) {
+  const status = error.response?.status;
+  const message = error.response?.data?.message || "";
+  const isLoginRequest = String(error.config?.url || "").replace(/^\/+/, "") === "login";
 
-    if (error.response?.status === 401 || /Unauthorized/i.test(message)) {
-      Utils.removeItem("user");
-      if (router.hasRoute("login")) {
-        router.push({ name: "login" });
-      }
+  if (status === 401 || /Unauthorized/i.test(message)) {
+    Utils.removeItem("user");
+    window.dispatchEvent(new CustomEvent("user-logged-out"));
+    if (router.hasRoute("login")) {
+      router.push({ name: "login" });
     }
-
-    return Promise.reject(error);
+  } else if (status === 403 && !isLoginRequest) {
+    window.dispatchEvent(new CustomEvent("api-forbidden", { detail: message || "Forbidden." }));
   }
-);
+
+  return Promise.reject(error);
+}
+
+apiClient.interceptors.response.use((response) => response, handleResponseError);
 
 export default apiClient;

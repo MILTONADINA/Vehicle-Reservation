@@ -3,9 +3,7 @@
 
 <template>
   <v-container class="py-10">
-    <h1 class="text-h4 mb-2">Vehicle Reservation</h1>
-    <p class="text-body-1">
-      Starter shell — add <code>features/feature-1-….md</code>, then implement with Cursor.
-    </p>
+    <h1 class="text-h4 mb-2" data-testid="home-heading">Vehicle Reservations</h1>
+    <p class="text-body-1">Reserve OC vehicles for approved trips.</p>
   </v-container>
 </template>
