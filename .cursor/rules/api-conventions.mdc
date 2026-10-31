@@ -9,7 +9,7 @@ globs: "backend/**/*, **/*.routes.js, **/*.controller.js, **/*.model.js"
 *   Express 4, mounted at `/vehicle-t6/`.
 *   Sequelize 6 + mysql2; config in `app/config/db.config.js` via dotenv.
 *   Separate `sequelizeInstance.js`; models import it and register in `models/index.js`.
-*   bcryptjs + jsonwebtoken + Session model for auth.
+*   jsonwebtoken + Session model for application sessions; Google ID tokens verified with google-auth-library (Feature 1). No password login.
 *   winston + morgan (morgan streams to winston).
 
 ## server.js Responsibilities
@@ -21,7 +21,7 @@ globs: "backend/**/*, **/*.routes.js, **/*.controller.js, **/*.model.js"
 
 ## Route Layout
 *   `app/routes/index.js` — central router registering each `*.routes.js`.
-*   Auth at mount root: `POST /register`, `POST /login`, `POST /logout`, `POST /reset-password` (dev only).
+*   Auth at mount root: `POST /login` (Google credential), `GET /auth/me`, `POST /logout`.
 *   Resource routes: `router.use("/lists", ListRoutes)` etc.
 *   Nested children on parent router: `GET /lists/:listId/todos`.
 
@@ -50,8 +50,7 @@ export default exports;
 *   Do **not** use `{ success, data }` envelopes.
 
 ## Model Conventions
-*   Sensitive fields excluded via `defaultScope` (e.g. User password).
-*   Use `Model.unscoped()` only when password compare is required at login.
+*   Controllers build explicit response payloads; `googleSub` and session tokens never appear in account responses. There is no password column.
 *   Associations and `hasMany`/`belongsTo` defined in `models/index.js`, not scattered in controllers.
 
 ## Schema Changes
@@ -61,4 +60,4 @@ Incremental scripts in `app/scripts/` — one concern per file, runnable via `np
 ```javascript
 router.get("/", [authenticate], controller.findAll);
 ```
-`authenticate` looks up Bearer token in Session table, checks expiration, sets `req.user`.
+`authenticate` verifies the Bearer JWT, looks it up in the Session table with its user, checks expiration, and sets `req.user = { id, role, areaId }`. Add `requireRole("admin", …)` after it for role-limited routes.

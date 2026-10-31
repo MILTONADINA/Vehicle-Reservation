@@ -1,19 +1,38 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "./views/Home.vue";
+import Login from "./views/Login.vue";
+import Utils from "./config/utils.js";
 
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: "/",
-      name: "home",
-      component: Home,
-    },
-    {
-      path: "/:pathMatch(.*)*",
-      redirect: { name: "home" },
-    },
-  ],
-});
+export function createAppRouter() {
+  const router = createRouter({
+    history: createWebHistory(import.meta.env.BASE_URL),
+    routes: [
+      {
+        path: "/",
+        name: "home",
+        component: Home,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "/login",
+        name: "login",
+        component: Login,
+      },
+      {
+        path: "/:pathMatch(.*)*",
+        redirect: { name: "home" },
+      },
+    ],
+  });
 
-export default router;
+  // Signed-out visitors are sent to Sign in; the session itself is validated by SessionGate.
+  router.beforeEach((to) => {
+    if (to.meta.requiresAuth && !Utils.getStore("user")?.token) {
+      return { name: "login" };
+    }
+  });
+
+  return router;
+}
+
+export default createAppRouter();

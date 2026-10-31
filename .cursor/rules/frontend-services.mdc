@@ -20,7 +20,7 @@ globs: "frontend/src/**/*.js, frontend/vite.config.js"
 *   Dev `baseURL`: `http://localhost:3200/vehicle-t6/`; prod: `/vehicle-t6/`.
 *   `withCredentials: true`.
 *   `transformRequest`: attach `Authorization: Bearer <token>` from `Utils.getStore("user")`.
-*   `transformResponse`: on unauthorized message, clear user and `Router.push({ name: "login" })`.
+*   Response interceptor (`handleResponseError`): on 401 clear user, dispatch `user-logged-out`, and `router.push({ name: "login" })`; on 403 dispatch `api-forbidden` with the message (the layout shows it without signing out).
 *   FormData uploads: delete `Content-Type` header so the browser sets the boundary.
 
 ## Router Conventions (`router.js`)

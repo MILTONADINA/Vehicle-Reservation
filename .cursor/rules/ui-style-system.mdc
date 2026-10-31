@@ -67,7 +67,7 @@ Map low → light chrome (list rows, subtle panels); medium → cards and primar
   <v-main><router-view /></v-main>
 </v-app>
 ```
-Hide `MenuBar` on login and register routes (Feature 1). Introduce `MenuBar` in Feature 2.
+`MenuBar` (Feature 1) renders only on routes with `meta.requiresAuth` and a stored session; it shows the signed-in email and **Sign out**, and is hidden on `/login`. Later features add their navigation links to it.
 
 ## Form Components
 *   Reusable forms use `v-model` via `defineProps({ modelValue })` + `emit("update:modelValue")`.
