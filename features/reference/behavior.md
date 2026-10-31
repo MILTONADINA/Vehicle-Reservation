@@ -32,7 +32,7 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 
 | Rule | Enforcement | Introduced |
 |------|-------------|------------|
-| The Login screen (`/login`) shows the heading **Sign in** and a Google button rendered by Google Identity Services with `VITE_GOOGLE_CLIENT_ID`; no password or registration fields. If the Google script has not loaded after 5 seconds the screen shows `Google sign-in could not be loaded. Reload the page.` | `frontend/src/views/Login.vue` | Feature 1 |
+| The Login screen (`/login`) shows the heading **Sign in** and a Google button rendered by Google Identity Services with `VITE_GOOGLE_CLIENT_ID`; no password or registration fields. If the Google script has not loaded after 5 seconds the screen shows `Google sign-in could not be loaded. Reload the page.`; without a configured `VITE_GOOGLE_CLIENT_ID` it shows `Google sign-in is not configured.` | `frontend/src/views/Login.vue` | Feature 1 |
 | A successful login response is stored as localStorage key `user` via `Utils`; API calls attach `Authorization: Bearer` from it | `Login.vue`, `services/services.js` | Feature 1 |
 | While a login request is pending a loading indicator shows and repeated credentials are ignored; a failed login shows the API message or `Sign-in could not be completed.` and stores nothing | `Login.vue` | Feature 1 |
 | Signed-out navigation to a protected route opens `/login` | `router.beforeEach` in `frontend/src/router.js` | Feature 1 |
