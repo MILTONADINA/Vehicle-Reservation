@@ -1,37 +1,52 @@
 ---
-description: Login, session, and frontend auth state patterns shared across features.
-globs: "frontend/src/**/*, backend/app/controllers/auth.*, backend/app/models/session.*, backend/app/routes/auth.*"
+description: Google sign-in, session, role, and frontend auth state patterns shared across features (Feature 1 contract).
+globs: "frontend/src/**/*, backend/app/controllers/auth.*, backend/app/models/session.*, backend/app/models/user.*, backend/app/routes/auth.*, backend/app/authorization/*"
 ---
 # Auth & Session Patterns
 
+Feature 1 replaces the starter's username/password example with Google sign-in. Spec: `features/feature-1-user-authentication-authorization.md`.
+
+## Identity
+*   Users sign in with an OC Google account only; no local passwords, registration, or reset.
+*   `POST /login` receives `{ credential }` (a Google ID token). `backend/app/authorization/googleVerifier.js` verifies it with `google-auth-library` against `GOOGLE_CLIENT_ID` (signature, issuer, audience, expiry) and throws `GoogleCredentialError` (→ 401) or `GoogleUnavailableError` (→ 503). Tests replace `googleVerifier.verifyIdToken`; they never contact Google.
+*   Accept only `email_verified === true` with both the hosted domain (`hd`) and the email domain exactly `oc.edu` or `eagles.oc.edu`; otherwise 403 `Use your OC Google account.`
+*   User fields: `googleSub` (unique, nullable), `email` (unique, lowercase), `firstName`, `lastName` (empty string when Google omits them), `role`.
+*   First sign-in creates a `requestor`. A provisioned account with null `googleSub` links on first sign-in without changing names or role. A subject or email already linked elsewhere → 409 `Google account could not be linked.` Never read identity or role from the request body.
+
+## Roles
+*   `admin`, `area_admin`, `requestor`, `maintenance`.
+*   `authenticate` (in `authorization/authorization.js`) verifies the Bearer JWT, loads the session with its user from the database, rejects expired, unknown, or user-less sessions with 401 `Unauthorized.`, and sets `req.user = { id, role, areaId }` (`areaId` null until Feature 2) plus `req.account` and `req.session`.
+*   `requireRole(...roles)` → 403 `Forbidden.` for any other authenticated role. Route order: `[authenticate, requireRole("admin")]`.
+*   The initial admin comes from `npm run seed:admin` (`ADMIN_EMAIL`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME`), never from a first-login rule.
+
 ## Session Model
-*   Fields: `token`, `email`, `expirationDate`, `userId` (FK to users).
-*   Token stored server-side; client sends it as Bearer header on each request.
-*   Session TTL: 24 hours (`expiresIn: 86400` on JWT; matching `expirationDate` on row).
-*   On login, reuse non-expired session for same email before issuing a new token.
+*   Fields: `token`, `email`, `expirationDate`, `userId` (FK to users, cascade on user delete).
+*   Token is a JWT signed with `AUTH_SECRET`, payload `{ userId, jti }`, `expiresIn` 24 hours; `expirationDate` is derived from the signed token's `exp`.
+*   On login, delete the user's expired session rows, reuse an unexpired session whose stored token still verifies, otherwise create a new one. User and session writes run in one transaction; a unique-constraint race on a first sign-in is retried once.
+*   Declare unique keys as model `indexes`, never attribute-level `unique`: `sync({ alter: true })` would add a duplicate index on every restart.
+*   `POST /logout` deletes only the presented session row.
+*   Never log credentials, tokens, or secrets; use `safeMessage(error)` for error text.
 
 ## Login Response Payload
-Return flat JSON (not wrapped):
+Flat JSON (not wrapped):
 ```json
 {
   "userId": 1,
-  "username": "jdoe",
-  "email": "jdoe@example.com",
-  "fName": "Jane",
-  "lName": "Doe",
-  "role": "worker",
+  "email": "avery.reed@oc.edu",
+  "firstName": "Avery",
+  "lastName": "Reed",
+  "role": "requestor",
+  "areaId": null,
   "token": "<jwt>"
 }
 ```
+`GET /auth/me` returns the same fields without `token`.
 
 ## Frontend Auth State
-*   Store full login response in `localStorage` key `user` via `Utils.setStore("user", res.data)`.
-*   `authServices.js`: `loginUser`, `logoutUser` methods calling `apiClient.post` (see `frontend-services.mdc`).
-*   Logout clears server session, then `Utils.removeItem("user")`, then route to login.
-*   `router.beforeEach`: if no `user` in store and route is not login → redirect to login.
-*   Axios token attachment and 401 redirect: `frontend-services.mdc`.
-
-## Registration (when spec requires)
-*   Hash password server-side before `User.create`.
-*   Validate required fields in controller; return `400` with `{ message }`.
-*   Mirror the same field rules in the Vue form with Vuetify validation rules.
+*   `index.html` loads `https://accounts.google.com/gsi/client`; `Login.vue` calls `google.accounts.id.initialize({ client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID, callback })` and `renderButton` (via `window.onGoogleLibraryLoad` when the script arrives late; after 5 seconds without it the screen shows `Google sign-in could not be loaded. Reload the page.`). A closed Google popup never calls back; the callback ignores responses without a credential.
+*   Store the full login response in `localStorage` key `user` via `Utils.setStore("user", res.data)`; dispatch `user-logged-in`.
+*   `authServices.js`: `loginWithGoogle({ credential })`, `me()`, `logoutUser()` (see `frontend-services.mdc`).
+*   `router.beforeEach`: `meta.requiresAuth` without a stored token → `{ name: "login" }`.
+*   `SessionGate.vue` wraps `<router-view>`: on each protected route it awaits `me()`, merges the account into the store (keeping the token), and shows `Session could not be checked.` + **Retry** on failure.
+*   Axios response errors (`handleResponseError`): 401 clears the store and routes to login; a 403 on any request other than `login` dispatches `api-forbidden` and `App.vue` shows `Forbidden.` until the route changes, without signing out.
+*   `MenuBar.vue` sign out: 200 or 401 → clear store, `user-logged-out`, route to login; other failures keep the session and show `Sign-out could not be completed. Try again.`
