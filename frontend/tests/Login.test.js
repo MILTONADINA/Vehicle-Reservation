@@ -217,6 +217,35 @@ describe("Feature 1 — User Authentication & Authorization", () => {
       expect(router.currentRoute.value.name).toBe("login");
       expect(wrapper.find("h1").text()).toBe("Sign in");
 
+      // A check started for one session must not apply to a different session that signed in meanwhile.
+      const other = { ...account, userId: 2, email: "blake.ortiz@oc.edu", firstName: "Blake", lastName: "Ortiz" };
+      let settleFirst;
+      let settleSecond;
+      AuthServices.me
+        .mockReturnValueOnce(new Promise((resolve) => { settleFirst = resolve; }))
+        .mockReturnValueOnce(new Promise((resolve) => { settleSecond = resolve; }));
+      Utils.setStore("user", session);
+      window.dispatchEvent(new CustomEvent("user-logged-in"));
+      await router.push("/");
+      await flushPromises();
+      await wrapper.find('[data-testid="sign-out"]').trigger("click");
+      await flushPromises();
+      Utils.setStore("user", { ...other, token: "second-session-token" });
+      window.dispatchEvent(new CustomEvent("user-logged-in"));
+      await router.push("/");
+      await flushPromises();
+      settleFirst({ data: account });
+      await flushPromises();
+      expect(Utils.getStore("user")).toEqual({ ...other, token: "second-session-token" });
+      expect(homeHeading(wrapper).exists()).toBe(false);
+      settleSecond({ data: other });
+      await flushPromises();
+      expect(homeHeading(wrapper).exists()).toBe(true);
+      expect(wrapper.find('[data-testid="signed-in-email"]').text()).toBe("blake.ortiz@oc.edu");
+      AuthServices.logoutUser.mockResolvedValue({ data: { message: "Signed out." } });
+      await wrapper.find('[data-testid="sign-out"]').trigger("click");
+      await flushPromises();
+
       // A check that fails after navigation must not replace the Login screen with the retry panel.
       let failLate;
       AuthServices.me.mockReturnValue(new Promise((_resolve, reject) => { failLate = reject; }));
