@@ -9,15 +9,20 @@
     "dev": "node --watch server.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "bundle": "node scripts/make-deploy.mjs"
+    "bundle": "node scripts/make-deploy.mjs",
+    "seed:admin": "node app/scripts/seed-admin.mjs"
   },
-  "keywords": ["node.js", "express", "sequelize"],
+  "keywords": [
+    "node.js",
+    "express",
+    "sequelize"
+  ],
   "license": "ISC",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mysql2": "^3.12.0",

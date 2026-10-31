@@ -1,12 +1,6 @@
 import db from "../app/models/index.js";
 
-/** Sync schema for tests (no models registered in the starter shell). */
+/** Recreate every registered table so each test starts from an empty schema. */
 export const syncTestDatabase = async () => {
   await db.sequelize.sync({ force: true });
 };
-
-/**
- * Add feature-specific helpers here as you implement auth/lists/etc.
- * Example after Feature 1:
- *   export const registerUser = async (overrides = {}) => { … }
- */
