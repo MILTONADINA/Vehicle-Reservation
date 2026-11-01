@@ -2,7 +2,7 @@
 
 **Feature ID:** 3  
 **Branch pattern:** `feature/3-user-management`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-26  
 **Input:** Allow admins to manage all OC accounts and area admins to view all users and edit or delete requestor and maintenance accounts.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 2 — Area Management](feature-2-area-management.md)  
@@ -159,7 +159,7 @@ Validate authentication and endpoint role first. For record operations validate 
 ## Screen Requirements
 
 * `/users`, route name `users`, heading **Users**; MenuBar link for admin and area_admin only. Feature 1 handles signed-out navigation; other signed-in roles return Home.
-* Columns: **Email**, **First name**, **Last name**, **Role**, **Area**, **Actions**. Area uses the existing areaName; a null assignment displays `Unassigned`.
+* Columns: **Email**, **First name**, **Last name**, **Role**, **Area**, **Actions**. Area uses the existing areaName; a null assignment displays `Unassigned`; an assigned account whose area name could not be loaded displays `Unavailable`.
 * An admin sees **Add user**, **Edit**, and **Delete** except Delete on their own account. Their own role control is locked. The Area control follows the role-based rule below for all accounts. An area admin sees every account, has no Add user control, and sees Edit/Delete only on requestor/maintenance rows. All admin/area_admin rows, including their own, are read-only to them.
 * Both manager roles load Feature 2’s complete GET `/areas` list to display area names. Only the admin has an editable Area selector. If the area request fails, keep successfully loaded users visible, show its API message or `Area options could not be loaded.`, and disable visible Add/Edit controls until reloading succeeds.
 * **Add user** dialog: **Email**, **First name**, **Last name**, **Role**, **Area**, **Save**, **Cancel**. **Edit user** shows the existing Email read-only and prefills the other values. Admin selects any supported role and area; the form enforces null area for admin and a required area for area_admin. Admin, requestor, and maintenance require Unassigned. The Area selector is enabled and required only when the admin selects area_admin. An area admin’s Edit dialog offers only requestor/maintenance and displays Area as read-only Unassigned.
@@ -498,13 +498,13 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-024** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-024** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
 
 
 ## Out of Scope

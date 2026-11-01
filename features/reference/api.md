@@ -54,6 +54,30 @@ Area fields: `{ "areaName": "Athletics", "areaLogo": "https://example.org/logo.p
 | Area still referenced (assigned users, later vehicles) | 409 | `Area is in use.` |
 | Database failure | 500 | `Area request failed.` |
 
+## Users
+
+| Method | Endpoint | Allowed role | Request | Success |
+|--------|----------|--------------|---------|---------|
+| GET | `/vehicle-t6/users` | admin, area_admin | none | `200`, array of User objects sorted by `lastName`, `firstName`, then `id` |
+| POST | `/vehicle-t6/users` | admin | User fields | `201`, new User object |
+| PUT | `/vehicle-t6/users/:id` | admin; area_admin only for requestor and maintenance targets | Update fields (complete replacement) | `200`, updated User object |
+| DELETE | `/vehicle-t6/users/:id` | admin; area_admin only for requestor and maintenance targets | none | `200`, `{ "message": "User deleted." }` |
+
+User fields: `{ "email": "avery.reed@oc.edu", "firstName": "Avery", "lastName": "Reed", "role": "requestor", "areaId": null }`. Update fields: the same without `email`; an `email` in a PUT body is ignored, as are other properties. User object: the fields plus `id`, never `googleSub`, sessions, or tokens. `email` is trimmed and lowercased, at most 254 characters, well formed, inside `oc.edu` / `eagles.oc.edu`, and unique. Names are trimmed, nonblank, at most 100 characters. `role` is `admin`, `area_admin`, `requestor`, or `maintenance`; `areaId` is an existing area id for `area_admin` and must be exactly `null` for every other role. A created account has no Google link until that person signs in (Feature 1 links it and keeps the id, role, and area). Changing a target's role or area ends all of that user's sessions in the same transaction; deleting a user deletes its sessions in the same transaction. No GET-by-id endpoint exists.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Missing, blank, non-string, over-length, or malformed field; unsupported role; role and area that do not match | 400 | `Invalid user data.` |
+| Route id not a positive safe integer | 400 | `User id must be a positive integer.` |
+| Area admin targeting an admin or area_admin account, or requesting one of those roles | 403 | `Forbidden.` |
+| Target user missing | 404 | `User with id=<id> not found.` |
+| `areaId` names no existing area | 404 | `Area with id=<id> not found.` |
+| Email already used by another account | 409 | `Email is already in use.` |
+| Admin changing their own role or deleting their own account | 409 | `You cannot remove your own admin access.` |
+| Database failure | 500 | `User request failed.` |
+
+PUT checks in this order: route id, target exists, area-admin limits, own admin access, field validation, area exists. POST checks field validation, then the email, then the area.
+
 ## Vehicles
 
 | Method | Endpoint | Allowed role | Request | Success |
@@ -76,10 +100,12 @@ Vehicle fields: `{ "make", "model", "year", "vin", "purchasedDate", "color", "pa
 | VIN already used (case-insensitive) by another vehicle | 409 | `VIN is already in use.` |
 | Database failure | 500 | `Vehicle request failed.` |
 
+
 ## Provenance
 
 | Area | Introduced |
 |------|------------|
 | Login, current account, logout | Feature 1 |
 | Areas list, create, update, delete | Feature 2 |
+| Users list, create, update, delete | Feature 3 |
 | Vehicles options, list, create, update, delete | Feature 4 |

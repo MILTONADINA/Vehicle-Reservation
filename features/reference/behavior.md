@@ -65,6 +65,30 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Save shows progress and blocks a second submit; success closes the dialog and reloads the list; failure keeps the values and shows the API message or `Area could not be saved.`; Cancel sends nothing and discards values and errors | `Areas.vue` `save()`, `cancelDialog()` | Feature 2 |
 | Delete opens **Delete area** asking `Delete this area?` with **Delete** and **Cancel**; Cancel sends nothing; a pending delete cannot be resubmitted; failure keeps the dialog and row and shows the API message or `Area could not be deleted.`; success closes it and reloads | `Areas.vue` `confirmDelete()` | Feature 2 |
 
+## Users
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Admin and area admin read every account's public record (id, email, names, role, areaId), sorted by `lastName`, `firstName`, then `id`; `googleSub` and sessions are never returned | `user.controller.js` `publicRecord()`, `list` | Feature 3 |
+| Only an admin creates accounts. Both manager roles update and delete, but an area admin may touch only requestor and maintenance accounts and may assign only those two roles (403 otherwise); requestor and maintenance get 403 before any record is read | `user.routes.js` (`requireRole`), `controller.update`, `controller.remove` | Feature 3 |
+| An admin cannot change their own role or delete their own account (409 `You cannot remove your own admin access.`) | `controller.update`, `controller.remove` | Feature 3 |
+| A provisioned email is trimmed, lowercased, well formed, at most 254 characters, inside `oc.edu` / `eagles.oc.edu`, and unique; email never changes after creation (a PUT body's `email` is ignored) | `normalizedEmail()`, the unique index, `controller.update` | Feature 3 |
+| Names are trimmed, nonblank, at most 100 characters; role is one of the four roles; `area_admin` requires an existing area id and every other role requires `areaId: null` | `trimmedName()`, `accessFields()`, `areaExists()` | Feature 3 |
+| A created account has `googleSub` null and keeps its id, role, and area when that person first signs in with Google (Feature 1 linking) | `controller.create` | Feature 3 |
+| Changing a target's role or area deletes all of that user's sessions in the same transaction as the update, so the old permissions end at once; deleting a user deletes its sessions in the same transaction | `controller.update`, `controller.remove` | Feature 3 |
+| PUT replaces names, role, and area; id, email, and `googleSub` never change through this API | `controller.update` | Feature 3 |
+
+## Users screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| `/users` (heading **Users**) is linked from MenuBar only for admin and area admin; the route guard sends other signed-in roles Home (`meta.roles`) and signed-out visitors to `/login` | `router.js`, `MenuBar.vue` | Feature 3 |
+| Columns: Email, First name, Last name, Role, Area, Actions. Area shows the area name, `Unassigned` for a null assignment, and `Unavailable` when the area list could not be loaded. Admin sees **Add user**, **Edit** on every row, and **Delete** on every row but its own; an area admin sees **Edit** and **Delete** only on requestor and maintenance rows | `views/Users.vue` | Feature 3 |
+| Users and areas load together and progress shows until both answer; `No users found.` appears only after a successful empty response; a failed user load shows the API message or `Users could not be loaded.`. A failed area load keeps the loaded users visible, shows the API message or `Area options could not be loaded.`, and disables **Add user** and **Edit** until a reload succeeds (the page, or the reload after a successful save or delete) | `Users.vue` `loadUsers()`, `loadAreas()` | Feature 3 |
+| One dialog (**Add user** / **Edit user**) with Email (read-only when editing), First name, Last name, Role, Area, **Save**, **Cancel**. Admin chooses any of the four roles; Area is enabled and required only while the role is `area_admin`, otherwise locked and showing `Unassigned`; an admin's own role control is locked. An area admin's dialog offers only requestor and maintenance and Area stays locked at `Unassigned`. The client applies the API rules (OC-domain email, names, role and area pairing) and shows `Invalid user data.` without sending a write | `Users.vue` `validUserFields()`, `rules` | Feature 3 |
+| Save shows progress and blocks a second submit; success closes the dialog and reloads users and areas; failure keeps the values and shows the API message or `User could not be saved.`; Cancel sends nothing and discards values and errors | `Users.vue` `save()`, `cancelDialog()` | Feature 3 |
+| Delete opens **Delete user** asking `Delete this user?` with **Delete** and **Cancel**; Cancel sends nothing; a pending delete cannot be resubmitted; failure keeps the dialog and row and shows the API message or `User could not be deleted.`; success closes it and reloads | `Users.vue` `confirmDelete()` | Feature 3 |
+
 ## Vehicles
 
 | Rule | Enforcement | Introduced |
@@ -86,3 +110,4 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Add/Edit dialogs use Make and Model combo boxes from `/vehicles/options`, Area from Feature 2 (fixed for area_admin), Save and Cancel; client validation shows `Invalid vehicle data.` without a write | `Vehicles.vue` | Feature 4 |
 | Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Vehicle could not be saved.`; Cancel discards values and errors | `Vehicles.vue` `save()`, `cancelDialog()` | Feature 4 |
 | Delete asks `Delete this vehicle?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Vehicle could not be deleted.` | `Vehicles.vue` `confirmDelete()` | Feature 4 |
+
