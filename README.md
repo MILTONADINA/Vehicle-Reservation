@@ -1,10 +1,10 @@
 # Vehicle Reservation
 
-Spec-Driven Development (SDD) starter kit — **empty product shell**.
+OC vehicle reservation system, built with Spec-Driven Development (SDD).
 
 Specifications define *what* to build (`features/`). Cursor rules define *how* (`.cursor/rules/`). Tests verify both.
 
-This repository was generated from the Speckit starter kit. Replace this README’s product name, database, and API prefix, then add `features/feature-1-….md` before writing application code.
+Features, their owners, and their reviewers are listed in [features/README.md](features/README.md).
 
 **Docs:** [features/framework.md](features/framework.md) · [docs/STARTER-KIT.md](docs/STARTER-KIT.md) · [docs/adr/README.md](docs/adr/README.md)
 
@@ -32,15 +32,22 @@ npm install
 # macOS / Linux / Git Bash:
 cp backend/.env.example backend/.env
 cp backend/.env.test.example backend/.env.test
+cp frontend/.env.example frontend/.env
 # Windows PowerShell / cmd:
 #   copy backend\.env.example backend\.env
 #   copy backend\.env.test.example backend\.env.test
+#   copy frontend\.env.example frontend\.env
 # Create MySQL databases `vehicle-t6` and `vehicle-t6-test`; set DB_* and AUTH_SECRET
+# Set the team's Google client ID as GOOGLE_CLIENT_ID (backend) and VITE_GOOGLE_CLIENT_ID (frontend)
+# Set ADMIN_EMAIL, ADMIN_FIRST_NAME, and ADMIN_LAST_NAME (backend) for the first administrator
 
 npm test
+cd backend && npm run seed:admin   # once, creates the tables and the first administrator
 cd backend && npm run dev
 cd frontend && npm run dev
 ```
+
+The `.env` files and the Google client ID are never committed.
 
 Works on **macOS, Windows, and Linux** — use `npm run …` for all tooling (PDF, Agility, bundles).
 
@@ -53,12 +60,13 @@ Works on **macOS, Windows, and Linux** — use `npm run …` for all tooling (PD
 | `feature/N-*` | One feature at a time |
 
 ```bash
-git checkout -b dev
-git checkout -b feature/1-short-name
+git fetch origin
+git checkout feature/N-short-name
+git merge origin/dev
 ```
 
-## Next steps
+## Building a feature
 
-1. Write `features/feature-1-….md` (see [framework template](features/framework.md#feature-spec-template) — **Status**, **Input**, **FR-00N**, **SC-00N**, **Key Entities**, **Agent implementation request**, **Definition of Done**).
-2. Update `features/README.md` catalog.
-3. Implement with Cursor: `Implement @features/feature-1-….md per its Agent implementation request and Definition of Done`, or one layer at a time (reference updates in the same PR when API/schema changes).
+1. Merge the latest `dev` into your feature branch, and restart the backend so new columns are added.
+2. Implement with Cursor: `Implement @features/feature-N-….md per its Agent implementation request and Definition of Done`, or one layer at a time (reference updates in the same PR when API/schema changes).
+3. Open a pull request into `dev` for the reviewer named in [features/README.md](features/README.md). See the [merge checklist](features/framework.md#merge-checklist--agility-sync).

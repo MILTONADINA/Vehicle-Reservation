@@ -46,7 +46,7 @@ Flat JSON (not wrapped):
 *   `index.html` loads `https://accounts.google.com/gsi/client`; `Login.vue` calls `google.accounts.id.initialize({ client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID, callback })` and `renderButton` (via `window.onGoogleLibraryLoad` when the script arrives late; after 5 seconds without it the screen shows `Google sign-in could not be loaded. Reload the page.`). A closed Google popup never calls back; the callback ignores responses without a credential.
 *   Store the full login response in `localStorage` key `user` via `Utils.setStore("user", res.data)`; dispatch `user-logged-in`.
 *   `authServices.js`: `loginWithGoogle({ credential })`, `me()`, `logoutUser()` (see `frontend-services.mdc`).
-*   `router.beforeEach`: `meta.requiresAuth` without a stored token → `{ name: "login" }`.
+*   `router.beforeEach`: `meta.requiresAuth` without a stored token → `{ name: "login" }`; `meta.roles` (allowed roles) with any other stored role → `{ name: "home" }`.
 *   `SessionGate.vue` wraps `<router-view>`: on each protected route it awaits `me()`, merges the account into the store (keeping the token), and shows `Session could not be checked.` + **Retry** on failure.
 *   Axios response errors (`handleResponseError`): 401 clears the store and routes to login; a 403 on any request other than `login` dispatches `api-forbidden` and `App.vue` shows `Forbidden.` until the route changes, without signing out.
 *   `MenuBar.vue` sign out: 200 or 401 → clear store, `user-logged-out`, route to login; other failures keep the session and show `Sign-out could not be completed. Try again.`

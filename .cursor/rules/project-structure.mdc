@@ -16,7 +16,7 @@ Vehicle-Reservation/
       views/                 # Route-level pages
       components/            # Reusable UI (forms, nav, dialogs)
       services/              # Axios API modules (*Services.js)
-      config/                # utils.js (localStorage, helpers)
+      config/                # utils.js (localStorage, helpers), auth.js (approved OC email domains)
       utils/                 # Pure helper functions
       plugins/               # vuetify.js, webfontloader.js
       router.js
