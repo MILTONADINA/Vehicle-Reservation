@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AuthServices from "../services/authServices.js";
 import Utils from "../config/utils.js";
@@ -11,6 +11,9 @@ const error = ref("");
 const refreshUser = () => { user.value = Utils.getStore("user"); };
 onMounted(() => window.addEventListener("user-logged-in", refreshUser));
 onBeforeUnmount(() => window.removeEventListener("user-logged-in", refreshUser));
+
+// Only the two manager roles see the Users link; the route guard enforces the same rule.
+const canManageUsers = computed(() => ["admin", "area_admin"].includes(user.value?.role));
 
 // Ends the server session, then forgets the local one. An already-invalid session (401)
 // is treated as signed out; any other failure keeps the session so the user can retry.
@@ -34,6 +37,7 @@ async function signOut() {
   <v-app-bar color="primary" density="comfortable">
     <v-app-bar-title>Vehicle Reservation</v-app-bar-title>
     <v-btn :to="{ name: 'areas' }" variant="text" data-testid="nav-areas">Areas</v-btn>
+    <v-btn v-if="canManageUsers" :to="{ name: 'users' }" variant="text" data-testid="nav-users">Users</v-btn>
     <span class="mx-4" data-testid="signed-in-email">{{ user?.email }}</span>
     <v-btn data-testid="sign-out" variant="text" @click="signOut">Sign out</v-btn>
   </v-app-bar>
