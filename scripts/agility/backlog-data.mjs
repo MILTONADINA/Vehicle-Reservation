@@ -264,7 +264,7 @@ export function buildBacklog(project = DEFAULT_PROJECT, options = {}) {
       epic: {
         ref: epicReference,
         name: feature.epic,
-        description: `Epic for ${feature.file}. Spec-driven backlog.`,
+        description: `${feature.epic}. Spec: ${feature.file}`,
         specLink: feature.file,
       },
       stories: featureStories,
