@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AuthServices from "../services/authServices.js";
 import Utils from "../config/utils.js";
@@ -7,6 +7,7 @@ import Utils from "../config/utils.js";
 const router = useRouter();
 const user = ref(Utils.getStore("user"));
 const error = ref("");
+const showVehicles = computed(() => user.value?.role === "admin" || user.value?.role === "area_admin");
 
 const refreshUser = () => { user.value = Utils.getStore("user"); };
 onMounted(() => window.addEventListener("user-logged-in", refreshUser));
@@ -34,6 +35,7 @@ async function signOut() {
   <v-app-bar color="primary" density="comfortable">
     <v-app-bar-title>Vehicle Reservation</v-app-bar-title>
     <v-btn :to="{ name: 'areas' }" variant="text" data-testid="nav-areas">Areas</v-btn>
+    <v-btn v-if="showVehicles" :to="{ name: 'vehicles' }" variant="text" data-testid="nav-vehicles">Vehicles</v-btn>
     <span class="mx-4" data-testid="signed-in-email">{{ user?.email }}</span>
     <v-btn data-testid="sign-out" variant="text" @click="signOut">Sign out</v-btn>
   </v-app-bar>

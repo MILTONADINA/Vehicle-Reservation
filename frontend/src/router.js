@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Home from "./views/Home.vue";
 import Login from "./views/Login.vue";
 import Areas from "./views/Areas.vue";
+import Vehicles from "./views/Vehicles.vue";
 import Utils from "./config/utils.js";
 
 export function createAppRouter() {
@@ -26,16 +27,26 @@ export function createAppRouter() {
         meta: { requiresAuth: true },
       },
       {
+        path: "/vehicles",
+        name: "vehicles",
+        component: Vehicles,
+        meta: { requiresAuth: true, roles: ["admin", "area_admin"] },
+      },
+      {
         path: "/:pathMatch(.*)*",
         redirect: { name: "home" },
       },
     ],
   });
 
-  // Signed-out visitors are sent to Sign in; the session itself is validated by SessionGate.
+  // Signed-out visitors go to Sign in; disallowed roles on Vehicles are sent Home.
   router.beforeEach((to) => {
-    if (to.meta.requiresAuth && !Utils.getStore("user")?.token) {
+    const user = Utils.getStore("user");
+    if (to.meta.requiresAuth && !user?.token) {
       return { name: "login" };
+    }
+    if (to.meta.roles && user?.token && !to.meta.roles.includes(user.role)) {
+      return { name: "home" };
     }
   });
 

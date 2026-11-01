@@ -64,3 +64,25 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Add and Edit use one dialog (**Add area** / **Edit area**) with Area name, Logo URL, a multiline Notice email limited to 5,000 characters with the help text `Your area's day-before-trip instructions. Trip details are added automatically.`, **Save** and **Cancel**; the client applies the API's rules and shows `Invalid area data.` without sending a write | `Areas.vue` dialog, `validAreaFields()` | Feature 2 |
 | Save shows progress and blocks a second submit; success closes the dialog and reloads the list; failure keeps the values and shows the API message or `Area could not be saved.`; Cancel sends nothing and discards values and errors | `Areas.vue` `save()`, `cancelDialog()` | Feature 2 |
 | Delete opens **Delete area** asking `Delete this area?` with **Delete** and **Cancel**; Cancel sends nothing; a pending delete cannot be resubmitted; failure keeps the dialog and row and shows the API message or `Area could not be deleted.`; success closes it and reloads | `Areas.vue` `confirmDelete()` | Feature 2 |
+
+## Vehicles
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Only admin and area_admin may call vehicle endpoints; requestor and maintenance get 403 | `vehicle.routes.js` `requireRole` | Feature 4 |
+| Admin lists every vehicle; area_admin lists only vehicles for its current database `areaId`; null assignment yields `[]` | `vehicle.controller.js` `list` / `scopeWhere` | Feature 4 |
+| Lists sort by `make`, then `model`, then `id` | `controller.list` | Feature 4 |
+| Admin may create/update/delete any vehicle for an existing area; area_admin may only write vehicles for its assigned area; a different body `areaId` is 403; out-of-scope update/delete is the same 404 as missing | controller create/update/remove | Feature 4 |
+| Make/model must match the standard lists; VIN is trimmed, uppercased, unique ignoring case; string fields trim outer spaces; year, passengers, plate expire month, and purchased date follow the documented ranges | `validVehicleFields()`, `vinTaken()`, `/vehicles/options` | Feature 4 |
+| Route ids must be positive safe integers; PUT replaces the editable fields and keeps `id`; clients cannot choose an id | `parseVehicleId()`, `vehiclePayload()` | Feature 4 |
+
+## Vehicles screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| `/vehicles` (heading **Vehicles**) is linked from MenuBar for admin and area_admin only; signed-out visitors go to Login; requestor and maintenance are sent Home | `router.js` `meta.roles`, `MenuBar.vue` | Feature 4 |
+| Columns: Make, Model, Year, Color, Passengers, Plate, Plate expires, Parking, Area (Feature 2 name), Actions; Add vehicle, Edit, and Delete are available for the caller's allowed rows | `views/Vehicles.vue` | Feature 4 |
+| The list shows progress while loading; `No vehicles found.` appears only after a successful empty response; a failed load shows the API message or `Vehicles could not be loaded.` | `Vehicles.vue` `load()` | Feature 4 |
+| Add/Edit dialogs use Make and Model combo boxes from `/vehicles/options`, Area from Feature 2 (fixed for area_admin), Save and Cancel; client validation shows `Invalid vehicle data.` without a write | `Vehicles.vue` | Feature 4 |
+| Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Vehicle could not be saved.`; Cancel discards values and errors | `Vehicles.vue` `save()`, `cancelDialog()` | Feature 4 |
+| Delete asks `Delete this vehicle?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Vehicle could not be deleted.` | `Vehicles.vue` `confirmDelete()` | Feature 4 |
