@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "./views/Home.vue";
 import Login from "./views/Login.vue";
+import Areas from "./views/Areas.vue";
 import Utils from "./config/utils.js";
 
 export function createAppRouter() {
@@ -17,6 +18,12 @@ export function createAppRouter() {
         path: "/login",
         name: "login",
         component: Login,
+      },
+      {
+        path: "/areas",
+        name: "areas",
+        component: Areas,
+        meta: { requiresAuth: true },
       },
       {
         path: "/:pathMatch(.*)*",
