@@ -14,6 +14,8 @@ export default (sequelize, DataTypes) =>
         allowNull: false,
         defaultValue: "requestor",
       },
+      // Only area admins are assigned an area; every other role keeps null.
+      areaId: { type: DataTypes.INTEGER, allowNull: true },
     },
     {
       indexes: [
