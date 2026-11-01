@@ -43,7 +43,7 @@ Flat JSON (not wrapped):
 `GET /auth/me` returns the same fields without `token`.
 
 ## Frontend Auth State
-*   `index.html` loads `https://accounts.google.com/gsi/client`; `Login.vue` calls `google.accounts.id.initialize({ client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID, callback })` and `renderButton` (via `window.onGoogleLibraryLoad` when the script arrives late; after 5 seconds without it the screen shows `Google sign-in could not be loaded. Reload the page.`). A closed Google popup never calls back; the callback ignores responses without a credential.
+*   `index.html` loads `https://accounts.google.com/gsi/client`; `Login.vue` calls `google.accounts.id.initialize({ client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID, callback })` and `renderButton` (via `window.onGoogleLibraryLoad` when the script arrives late; after 5 seconds without it the screen shows `Google sign-in could not be loaded. Reload the page.`; with no `VITE_GOOGLE_CLIENT_ID` it shows `Google sign-in is not configured.`). A closed Google popup never calls back; the callback ignores responses without a credential.
 *   Store the full login response in `localStorage` key `user` via `Utils.setStore("user", res.data)`; dispatch `user-logged-in`.
 *   `authServices.js`: `loginWithGoogle({ credential })`, `me()`, `logoutUser()` (see `frontend-services.mdc`).
 *   `router.beforeEach`: `meta.requiresAuth` without a stored token → `{ name: "login" }`; `meta.roles` (allowed roles) with any other stored role → `{ name: "home" }`.

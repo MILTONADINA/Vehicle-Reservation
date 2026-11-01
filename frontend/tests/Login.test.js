@@ -87,8 +87,20 @@ describe("Feature 1 — User Authentication & Authorization", () => {
       expect(late.find('[data-testid="google-signin"]').exists()).toBe(true);
       expect(late.text()).not.toContain("Google sign-in could not be loaded.");
 
-      // If the script never arrives, the screen says so instead of showing an empty card.
+      // Without a configured client ID the screen says so and never asks Google for a button.
       late.unmount();
+      mounted.pop();
+      vi.clearAllMocks();
+      window.google = { accounts: { id: google } };
+      vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "");
+      const unconfigured = await mountApp("/login");
+      expect(unconfigured.text()).toContain("Google sign-in is not configured.");
+      expect(google.initialize).not.toHaveBeenCalled();
+      expect(google.renderButton).not.toHaveBeenCalled();
+      vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-google-client-id");
+
+      // If the script never arrives, the screen says so instead of showing an empty card.
+      unconfigured.unmount();
       mounted.pop();
       vi.clearAllMocks();
       delete window.google;
