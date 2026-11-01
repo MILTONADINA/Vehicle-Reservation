@@ -30,3 +30,4 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Area | Introduced |
 |------|------------|
 | Authentication, sessions, roles (users, sessions; login / auth/me / logout; seed:admin) | Feature 1 |
+| Areas (areas table, users.areaId; /areas list, create, update, delete; Areas screen) | Feature 2 |

@@ -33,7 +33,8 @@ async function signOut() {
 <template>
   <v-app-bar color="primary" density="comfortable">
     <v-app-bar-title>Vehicle Reservation</v-app-bar-title>
-    <span class="mr-4" data-testid="signed-in-email">{{ user?.email }}</span>
+    <v-btn :to="{ name: 'areas' }" variant="text" data-testid="nav-areas">Areas</v-btn>
+    <span class="mx-4" data-testid="signed-in-email">{{ user?.email }}</span>
     <v-btn data-testid="sign-out" variant="text" @click="signOut">Sign out</v-btn>
   </v-app-bar>
   <v-alert v-if="error" type="error" density="compact" class="ma-4">{{ error }}</v-alert>

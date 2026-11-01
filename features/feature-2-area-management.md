@@ -2,7 +2,7 @@
 
 **Feature ID:** 2  
 **Branch pattern:** `feature/2-area-management`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-26  
 **Input:** Maintain OC areas with an area name, logo, and custom day-before-trip reminder text, while limiting area administrators’ edits to their own area.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md)  
@@ -465,13 +465,13 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-017** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-017** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
 
 
 ## Out of Scope
