@@ -8,6 +8,7 @@ const router = useRouter();
 const error = ref("");
 const loading = ref(false);
 const scriptUnavailable = ref(false);
+const notConfigured = ref(!import.meta.env.VITE_GOOGLE_CLIENT_ID);
 const buttonHost = ref(null);
 const SCRIPT_WAIT_MS = 5000;
 let scriptTimer = null;
@@ -49,6 +50,9 @@ function renderGoogleButton() {
 // The Google script loads asynchronously; if it is not ready yet, it calls onGoogleLibraryLoad when it is.
 // If it never arrives (blocked or offline), the screen says so instead of showing an empty card.
 onMounted(() => {
+  if (notConfigured.value) {
+    return;
+  }
   if (window.google?.accounts?.id) {
     renderGoogleButton();
   } else {
@@ -75,7 +79,10 @@ onBeforeUnmount(() => {
           <h1 class="text-h4 mb-2">Sign in</h1>
           <p class="text-body-1 mb-6">Use your OC Google account.</p>
           <v-alert v-if="error" type="error" density="compact" class="mb-4">{{ error }}</v-alert>
-          <v-alert v-if="scriptUnavailable" type="error" density="compact" class="mb-4" data-testid="google-unavailable">
+          <v-alert v-if="notConfigured" type="error" density="compact" class="mb-4" data-testid="google-not-configured">
+            Google sign-in is not configured.
+          </v-alert>
+          <v-alert v-else-if="scriptUnavailable" type="error" density="compact" class="mb-4" data-testid="google-unavailable">
             Google sign-in could not be loaded. Reload the page.
           </v-alert>
           <div ref="buttonHost" data-testid="google-signin" class="mb-4"></div>

@@ -162,7 +162,7 @@ The initial-admin seed is an operator command, not an HTTP endpoint. Its only in
 
 ## Screen Requirements
 
-* **Login** — `/login`, route name `login`: heading **Sign in**, Google sign-in button. No local username/password or register controls. A pending exchange shows progress and suppresses resubmission. Cancellation leaves this screen unchanged. If the Google sign-in script does not load within a few seconds, the screen shows `Google sign-in could not be loaded. Reload the page.` in place of the button.
+* **Login** — `/login`, route name `login`: heading **Sign in**, Google sign-in button. No local username/password or register controls. A pending exchange shows progress and suppresses resubmission. Cancellation leaves this screen unchanged. If the Google sign-in script does not load within a few seconds, the screen shows `Google sign-in could not be loaded. Reload the page.` in place of the button. If no Google client ID is configured, the screen shows `Google sign-in is not configured.` in place of the button.
 * **Home** — `/`, route name `home`: heading **Vehicle Reservations**, signed-in email, and a **Sign out** action in MenuBar. Resource links are introduced by their owning features.
 * A successful login stores its flat response with Utils; API calls attach its token through the existing axios service pattern.
 * Protected navigation waits for `/auth/me`. A failed check hides protected content and displays `Session could not be checked.` and **Retry**; retry repeats that check. A 401 clears the store and opens Login.
