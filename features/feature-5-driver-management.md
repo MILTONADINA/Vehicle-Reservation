@@ -315,6 +315,16 @@ Register the Driver model in `models/index.js`. This feature does not add a fore
 * **When** the create request finishes
 * **Then** the dialog stays open with the entered values and shows the API message or Driver could not be saved.
 
+#### Scenario: Oversized driver names are rejected
+* **Given** an admin posts a firstName or lastName longer than 100 characters
+* **When** POST /vehicle-t6/drivers is sent
+* **Then** the response is 400 with message Invalid driver data. and no driver is stored
+
+#### Scenario: Driver storage failures return a safe error
+* **Given** an authorized list, create, update, or delete encounters a database failure
+* **When** each operation is attempted
+* **Then** each response is 500 with message Driver request failed. and unsuccessful writes leave existing records unchanged
+
 ### US-5.3 — Edit a driver
 
 #### Scenario: Admin updates a driver
@@ -398,18 +408,6 @@ Register the Driver model in `models/index.js`. This feature does not add a fore
 * **Given** the delete confirmation is open
 * **When** the user selects Cancel
 * **Then** no delete request is sent and the driver remains on the list
-
-### US-5.2 — Add a driver
-
-#### Scenario: Oversized driver names are rejected
-* **Given** an admin posts a firstName or lastName longer than 100 characters
-* **When** POST /vehicle-t6/drivers is sent
-* **Then** the response is 400 with message Invalid driver data. and no driver is stored
-
-#### Scenario: Driver storage failures return a safe error
-* **Given** an authorized list, create, update, or delete encounters a database failure
-* **When** each operation is attempted
-* **Then** each response is 500 with message Driver request failed. and unsuccessful writes leave existing records unchanged
 
 ## Test Coverage Map
 
