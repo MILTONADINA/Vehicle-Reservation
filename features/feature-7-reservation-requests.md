@@ -232,6 +232,11 @@ Register associations in `models/index.js`. This feature does not add vehicleId;
 * **When** a requestor lists reservation requests
 * **Then** the response is 200 with []
 
+#### Scenario: Reservation request list sorts by date, null times first, then id
+* **Given** several own requests share a departureDate, some with null departureTime and some with the same timed departure
+* **When** the requestor lists reservation requests
+* **Then** rows sort by departureDate ascending, null departureTime before timed values, timed values ascending, then id ascending
+
 #### Scenario: Maintenance cannot access reservation requests
 * **Given** the signed-in role is maintenance
 * **When** GET, POST, PUT, or cancel is sent to an applicable reservation-request route
@@ -324,6 +329,21 @@ Register associations in `models/index.js`. This feature does not add vehicleId;
 * **When** POST /vehicle-t6/reservation-requests is sent
 * **Then** the response is 400 with message Invalid reservation request data. and no request is stored
 
+#### Scenario: Impossible dates and out-of-range times are rejected
+* **Given** a requestor posts departureDate 2026-02-30, or departureTime 25:00, or a timed return equal to departure
+* **When** POST /vehicle-t6/reservation-requests is sent
+* **Then** the response is 400 with message Invalid reservation request data. and no request is stored
+
+#### Scenario: Whole-day trip on a single date is accepted
+* **Given** a requestor posts the same departureDate and returnDate with both times null
+* **When** POST /vehicle-t6/reservation-requests is sent
+* **Then** the response is 201 with those dates saved and both times null
+
+#### Scenario: Unknown noteType is rejected
+* **Given** a requestor posts noteType urgent with noteText
+* **When** POST /vehicle-t6/reservation-requests is sent
+* **Then** the response is 400 with message Invalid reservation request data. and no request is stored
+
 #### Scenario: Admin and area admin cannot create a reservation request
 * **Given** the signed-in role is admin or area_admin
 * **When** each role posts valid reservation request data
@@ -348,6 +368,16 @@ Register associations in `models/index.js`. This feature does not add vehicleId;
 * **Given** a requestor is on Reservation requests
 * **When** the requestor selects Add request
 * **Then** the Add request dialog shows the documented fields including destination mode, optional times, optional notes, Save, and Cancel
+
+#### Scenario: Add request offers only approved drivers and active destinations
+* **Given** the driver catalog includes inactive drivers and the destination catalog includes inactive destinations
+* **When** a requestor opens Add request
+* **Then** the Driver combo lists only approved drivers and the Destination combo lists only active destinations
+
+#### Scenario: Edit and Cancel are hidden on non-requested rows
+* **Given** a requestor owns requested, cancelled, and awaiting_vehicle rows
+* **When** the Reservation requests page renders
+* **Then** Edit and Cancel appear only on the requested row
 
 #### Scenario: Saving a reservation request updates the list
 * **Given** valid request fields are entered and POST succeeds
@@ -484,6 +514,7 @@ Exact `it(...)` titles. Backend file: `backend/tests/reservationRequests.test.js
 | US-7.1 | Area admin lists only requests for its area | `backend/tests/reservationRequests.test.js` | `it("Area admin lists only requests for its area")` |
 | US-7.1 | Area admin without an assignment gets an empty reservation request list | `backend/tests/reservationRequests.test.js` | `it("Area admin without an assignment gets an empty reservation request list")` |
 | US-7.1 | Empty reservation request list is returned | `backend/tests/reservationRequests.test.js` | `it("Empty reservation request list is returned")` |
+| US-7.1 | Reservation request list sorts by date, null times first, then id | `backend/tests/reservationRequests.test.js` | `it("Reservation request list sorts by date, null times first, then id")` |
 | US-7.1 | Maintenance cannot access reservation requests | `backend/tests/reservationRequests.test.js` | `it("Maintenance cannot access reservation requests")` |
 | US-7.1 | Reservation request API requires a session | `backend/tests/reservationRequests.test.js` | `it("Reservation request API requires a session")` |
 | US-7.1 | Requests page shows allowed records and actions | `frontend/tests/ReservationRequests.test.js` | `it("Requests page shows allowed records and actions")` |
@@ -500,6 +531,9 @@ Exact `it(...)` titles. Backend file: `backend/tests/reservationRequests.test.js
 | US-7.2 | Missing area on reservation request is rejected | `backend/tests/reservationRequests.test.js` | `it("Missing area on reservation request is rejected")` |
 | US-7.2 | Return before departure is rejected | `backend/tests/reservationRequests.test.js` | `it("Return before departure is rejected")` |
 | US-7.2 | One-sided times are rejected | `backend/tests/reservationRequests.test.js` | `it("One-sided times are rejected")` |
+| US-7.2 | Impossible dates and out-of-range times are rejected | `backend/tests/reservationRequests.test.js` | `it("Impossible dates and out-of-range times are rejected")` |
+| US-7.2 | Whole-day trip on a single date is accepted | `backend/tests/reservationRequests.test.js` | `it("Whole-day trip on a single date is accepted")` |
+| US-7.2 | Unknown noteType is rejected | `backend/tests/reservationRequests.test.js` | `it("Unknown noteType is rejected")` |
 | US-7.2 | Invalid passengers on reservation request are rejected | `backend/tests/reservationRequests.test.js` | `it("Invalid passengers on reservation request are rejected")` |
 | US-7.2 | Optional notes require both type and text | `backend/tests/reservationRequests.test.js` | `it("Optional notes require both type and text")` |
 | US-7.2 | Admin and area admin cannot create a reservation request | `backend/tests/reservationRequests.test.js` | `it("Admin and area admin cannot create a reservation request")` |
@@ -511,6 +545,8 @@ Exact `it(...)` titles. Backend file: `backend/tests/reservationRequests.test.js
 | US-7.2 | Referenced driver cannot be deleted while in use | `backend/tests/reservationRequests.test.js` | `it("Referenced driver cannot be deleted while in use")` |
 | US-7.2 | Referenced area cannot be deleted while in use | `backend/tests/reservationRequests.test.js` | `it("Referenced area cannot be deleted while in use")` |
 | US-7.2 | Add request opens the specified form | `frontend/tests/ReservationRequests.test.js` | `it("Add request opens the specified form")` |
+| US-7.2 | Add request offers only approved drivers and active destinations | `frontend/tests/ReservationRequests.test.js` | `it("Add request offers only approved drivers and active destinations")` |
+| US-7.2 | Edit and Cancel are hidden on non-requested rows | `frontend/tests/ReservationRequests.test.js` | `it("Edit and Cancel are hidden on non-requested rows")` |
 | US-7.2 | Saving a reservation request updates the list | `frontend/tests/ReservationRequests.test.js` | `it("Saving a reservation request updates the list")` |
 | US-7.2 | Cancel leaves reservation form changes unchanged | `frontend/tests/ReservationRequests.test.js` | `it("Cancel leaves reservation form changes unchanged")` |
 | US-7.2 | Reservation request form rejects invalid fields before submitting | `frontend/tests/ReservationRequests.test.js` | `it("Reservation request form rejects invalid fields before submitting")` |
