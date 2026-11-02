@@ -2,6 +2,7 @@
  * Feature 5 — Driver Management
  * Spec: features/feature-5-driver-management.md
  */
+import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../server.js";
 import db from "../app/models/index.js";
@@ -54,13 +55,18 @@ afterAll(async () => { await db.sequelize.close(); });
 describe("Feature 5 — Driver Management", () => {
   describe("US-5.1 — View drivers", () => {
     it("Admin lists every driver in name order", async () => {
+      // Same last name (Lee) exercises firstName; two identical Jordan Lee rows exercise id.
+      const leeJordanFirst = await db.driver.create(jordan);
+      const leeAvery = await db.driver.create({ ...jordan, firstName: "Avery" });
+      const leeJordanSecond = await db.driver.create(jordan);
       const smith = await db.driver.create(avery);
-      const lee = await db.driver.create(jordan);
       const { token } = await signInAs("admin");
       const response = await list(token);
       expect(response.status).toBe(200);
       expect(response.body).toEqual([
-        { ...jordan, id: lee.id },
+        { ...jordan, firstName: "Avery", id: leeAvery.id },
+        { ...jordan, id: leeJordanFirst.id },
+        { ...jordan, id: leeJordanSecond.id },
         { ...avery, id: smith.id },
       ]);
       expect(Object.keys(response.body[0]).sort()).toEqual(driverKeys);
@@ -156,6 +162,20 @@ describe("Feature 5 — Driver Management", () => {
       expect(response.body.licenseState).toBe("OK");
     });
 
+    it("Oversized driver names are rejected", async () => {
+      const { token } = await signInAs("admin");
+      const tooLong = "a".repeat(101);
+      for (const body of [
+        { ...jordan, firstName: tooLong },
+        { ...jordan, lastName: tooLong },
+      ]) {
+        const response = await create(token, body);
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: "Invalid driver data." });
+      }
+      expect(await snapshot()).toEqual([]);
+    });
+
     it("Unknown license state is rejected", async () => {
       const { token } = await signInAs("admin");
       for (const licenseState of ["XX", "Oklahoma", "O"]) {
@@ -216,6 +236,25 @@ describe("Feature 5 — Driver Management", () => {
       expect(response.body.id).not.toBe(99);
       expect(response.body).not.toHaveProperty("extra");
       expect(Object.keys(response.body).sort()).toEqual(driverKeys);
+    });
+
+    it("Driver storage failures return a safe error", async () => {
+      const driver = await db.driver.create(jordan);
+      const before = await snapshot();
+      const { token } = await signInAs("admin");
+      const failures = [
+        [jest.spyOn(db.driver, "findAll").mockRejectedValueOnce(new Error("connection lost")), () => list(token)],
+        [jest.spyOn(db.driver, "create").mockRejectedValueOnce(new Error("connection lost")), () => create(token, avery)],
+        [jest.spyOn(db.driver.prototype, "update").mockRejectedValueOnce(new Error("connection lost")), () => update(token, driver.id, avery)],
+        [jest.spyOn(db.driver.prototype, "destroy").mockRejectedValueOnce(new Error("connection lost")), () => remove(token, driver.id)],
+      ];
+      for (const [spy, run] of failures) {
+        const response = await run();
+        spy.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ message: "Driver request failed." });
+      }
+      expect(await snapshot()).toEqual(before);
     });
   });
 
