@@ -256,6 +256,32 @@ describe("Feature 4 — Vehicle Management", () => {
       expect(byTestId("cancel-vehicle").textContent).toContain("Cancel");
     });
 
+    it("Area admin area field is fixed to its assigned area", async () => {
+      const wrapper = await openVehicles("area_admin", 2, [express]);
+      await wrapper.find('[data-testid="add-vehicle"]').trigger("click");
+      await flushPromises();
+      const area = wrapper.findComponent('[data-testid="vehicle-area"]');
+      expect(area.props("disabled")).toBe(true);
+      expect(area.props("modelValue")).toBe(2);
+      expect(area.props("items").map((item) => item.areaName ?? item.title)).toEqual(["Maintenance"]);
+    });
+
+    it("Model options reset when Make changes", async () => {
+      const wrapper = await openVehicles("admin");
+      await wrapper.find('[data-testid="add-vehicle"]').trigger("click");
+      await flushPromises();
+      await choose("vehicle-make", "Ford");
+      await choose("vehicle-model", "Transit");
+      expect(wrapper.findComponent('[data-testid="vehicle-model"]').props("modelValue")).toBe("Transit");
+      expect(wrapper.findComponent('[data-testid="vehicle-model"]').props("items")).toContain("Transit");
+
+      await choose("vehicle-make", "Chevrolet");
+      const model = wrapper.findComponent('[data-testid="vehicle-model"]');
+      expect(model.props("modelValue") == null || model.props("modelValue") === "").toBe(true);
+      expect(model.props("items")).toContain("Express");
+      expect(model.props("items")).not.toContain("Transit");
+    });
+
     it("Saving a vehicle updates the list", async () => {
       const wrapper = await openVehicles("admin");
       await wrapper.find('[data-testid="add-vehicle"]').trigger("click");

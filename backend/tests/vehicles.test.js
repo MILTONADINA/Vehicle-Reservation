@@ -2,6 +2,7 @@
  * Feature 4 — Vehicle Management
  * Spec: features/feature-4-vehicle-management.md
  */
+import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../server.js";
 import db from "../app/models/index.js";
@@ -231,6 +232,28 @@ describe("Feature 4 — Vehicle Management", () => {
       expect(await db.vehicle.count()).toBe(1);
     });
 
+    it("Duplicate VIN unique-index fallback is rejected", async () => {
+      const { area1, area2 } = await seedAreas();
+      await db.vehicle.create(fordTransit(area1));
+      const { token } = await signInAs("admin");
+      // A create that lands between the pre-check and the insert: the unique index answers instead.
+      const miss = jest.spyOn(db.vehicle, "count").mockResolvedValueOnce(0);
+      const response = await create(token, { ...chevyExpress(area2), vin: "1FTBR1C80MKA12345" });
+      miss.mockRestore();
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "VIN is already in use." });
+      expect(await db.vehicle.count()).toBe(1);
+    });
+
+    it("Year above the allowed upper bound is rejected", async () => {
+      const { area1 } = await seedAreas();
+      const { token } = await signInAs("admin");
+      const response = await create(token, { ...fordTransit(area1), year: new Date().getFullYear() + 2 });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "Invalid vehicle data." });
+      expect(await db.vehicle.count()).toBe(0);
+    });
+
     it("Unknown make or model is rejected", async () => {
       const { area1 } = await seedAreas();
       const { token } = await signInAs("admin");
@@ -376,6 +399,17 @@ describe("Feature 4 — Vehicle Management", () => {
       const response = await remove(token, 9999);
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ message: "Vehicle with id=9999 not found." });
+    });
+
+    it("Area with vehicles cannot be deleted", async () => {
+      const { area1 } = await seedAreas();
+      await db.vehicle.create(chevyExpress(area1));
+      const { token } = await signInAs("admin");
+      const response = await auth(request(app).delete(`/vehicle-t6/areas/${area1}`), token);
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "Area is in use." });
+      expect(await db.area.findByPk(area1)).not.toBeNull();
+      expect(await db.vehicle.count({ where: { areaId: area1 } })).toBe(1);
     });
   });
 });
