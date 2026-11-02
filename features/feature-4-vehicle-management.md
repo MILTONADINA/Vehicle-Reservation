@@ -2,7 +2,7 @@
 
 **Feature ID:** 4  
 **Branch pattern:** `feature/4-vehicle-management`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-27  
 **Input:** Allow admins and area admins to maintain the OC fleet. A vehicle has make, model, year, VIN, purchased date, color, passenger count, plate number, plate expire month, designated parking, and an assigned area. Make and model come from a standard combo-box list.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 2 — Area Management](feature-2-area-management.md)
@@ -306,6 +306,16 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 * **When** an admin creates another vehicle with the same vin in different letter case
 * **Then** the response is 409 with message VIN is already in use. and no extra vehicle is stored
 
+#### Scenario: Duplicate VIN unique-index fallback is rejected
+* **Given** a vehicle with a VIN already exists and the pre-check misses it
+* **When** an admin creates another vehicle with the same VIN
+* **Then** the response is 409 with message VIN is already in use. and no extra vehicle is stored
+
+#### Scenario: Year above the allowed upper bound is rejected
+* **Given** an admin posts a vehicle whose year is greater than the current calendar year plus one
+* **When** POST /vehicle-t6/vehicles is sent
+* **Then** the response is 400 with message Invalid vehicle data. and no vehicle is stored
+
 #### Scenario: Unknown make or model is rejected
 * **Given** an admin posts a make or model that is not on the standard lists, or a model that does not belong to the make
 * **When** POST /vehicle-t6/vehicles is sent
@@ -330,6 +340,16 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 * **Given** an admin is on Vehicles
 * **When** the admin selects Add vehicle
 * **Then** the Add vehicle dialog shows Make, Model, Year, VIN, Purchased date, Color, Passengers, Plate number, Plate expire month, Designated parking, Area, Save, and Cancel
+
+#### Scenario: Area admin area field is fixed to its assigned area
+* **Given** an area_admin with an assigned area opens Add vehicle
+* **When** the dialog is shown
+* **Then** Area is fixed to that assigned area, other areas are not offered, and the control is not editable
+
+#### Scenario: Model options reset when Make changes
+* **Given** the Add vehicle dialog has a Make and Model selected
+* **When** the user selects a different Make whose models do not include the current Model
+* **Then** Model is cleared and only models for the new Make are offered
 
 #### Scenario: Saving a vehicle updates the list
 * **Given** valid vehicle fields are entered and POST succeeds
@@ -415,6 +435,11 @@ Register Vehicle belongsTo Area and Area hasMany Vehicle in `models/index.js`. T
 * **When** an admin sends DELETE /vehicle-t6/vehicles/9999
 * **Then** the response is 404 with message Vehicle with id=9999 not found.
 
+#### Scenario: Area with vehicles cannot be deleted
+* **Given** an area still has at least one vehicle
+* **When** an admin sends DELETE /vehicle-t6/areas/:id for that area
+* **Then** the response is 409 with message Area is in use. and the area and vehicle remain
+
 #### Scenario: Delete vehicle requires confirmation
 * **Given** an allowed vehicle row is shown on Vehicles
 * **When** the user selects Delete
@@ -464,6 +489,10 @@ Exact `it(...)` titles. Backend file: `backend/tests/vehicles.test.js`. Frontend
 | US-4.2 | Requestor and maintenance cannot create a vehicle | `backend/tests/vehicles.test.js` | `it("Requestor and maintenance cannot create a vehicle")` |
 | US-4.2 | Client cannot select a vehicle primary key | `backend/tests/vehicles.test.js` | `it("Client cannot select a vehicle primary key")` |
 | US-4.2 | Add vehicle opens the specified form | `frontend/tests/Vehicles.test.js` | `it("Add vehicle opens the specified form")` |
+| US-4.2 | Area admin area field is fixed to its assigned area | `frontend/tests/Vehicles.test.js` | `it("Area admin area field is fixed to its assigned area")` |
+| US-4.2 | Model options reset when Make changes | `frontend/tests/Vehicles.test.js` | `it("Model options reset when Make changes")` |
+| US-4.2 | Year above the allowed upper bound is rejected | `backend/tests/vehicles.test.js` | `it("Year above the allowed upper bound is rejected")` |
+| US-4.2 | Duplicate VIN unique-index fallback is rejected | `backend/tests/vehicles.test.js` | `it("Duplicate VIN unique-index fallback is rejected")` |
 | US-4.2 | Saving a vehicle updates the list | `frontend/tests/Vehicles.test.js` | `it("Saving a vehicle updates the list")` |
 | US-4.2 | Cancel leaves vehicle records unchanged | `frontend/tests/Vehicles.test.js` | `it("Cancel leaves vehicle records unchanged")` |
 | US-4.2 | Vehicle form rejects invalid fields before submitting | `frontend/tests/Vehicles.test.js` | `it("Vehicle form rejects invalid fields before submitting")` |
@@ -480,6 +509,7 @@ Exact `it(...)` titles. Backend file: `backend/tests/vehicles.test.js`. Frontend
 | US-4.4 | Area admin deletes an unused vehicle in its area | `backend/tests/vehicles.test.js` | `it("Area admin deletes an unused vehicle in its area")` |
 | US-4.4 | Area admin cannot delete a vehicle in another area | `backend/tests/vehicles.test.js` | `it("Area admin cannot delete a vehicle in another area")` |
 | US-4.4 | Deleting a missing vehicle is rejected | `backend/tests/vehicles.test.js` | `it("Deleting a missing vehicle is rejected")` |
+| US-4.4 | Area with vehicles cannot be deleted | `backend/tests/vehicles.test.js` | `it("Area with vehicles cannot be deleted")` |
 | US-4.4 | Delete vehicle requires confirmation | `frontend/tests/Vehicles.test.js` | `it("Delete vehicle requires confirmation")` |
 | US-4.4 | Confirmed vehicle deletion refreshes the list | `frontend/tests/Vehicles.test.js` | `it("Confirmed vehicle deletion refreshes the list")` |
 | US-4.4 | Failed vehicle deletion preserves the dialog and row | `frontend/tests/Vehicles.test.js` | `it("Failed vehicle deletion preserves the dialog and row")` |
@@ -503,15 +533,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-020** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 4 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-020** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 4 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 

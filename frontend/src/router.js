@@ -3,6 +3,7 @@ import Home from "./views/Home.vue";
 import Login from "./views/Login.vue";
 import Areas from "./views/Areas.vue";
 import Users from "./views/Users.vue";
+import Vehicles from "./views/Vehicles.vue";
 import Utils from "./config/utils.js";
 
 export function createAppRouter() {
@@ -30,6 +31,12 @@ export function createAppRouter() {
         path: "/users",
         name: "users",
         component: Users,
+        meta: { requiresAuth: true, roles: ["admin", "area_admin"] },
+      },
+      {
+        path: "/vehicles",
+        name: "vehicles",
+        component: Vehicles,
         meta: { requiresAuth: true, roles: ["admin", "area_admin"] },
       },
       {

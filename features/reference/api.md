@@ -78,6 +78,29 @@ User fields: `{ "email": "avery.reed@oc.edu", "firstName": "Avery", "lastName": 
 
 PUT checks in this order: route id, target exists, area-admin limits, own admin access, field validation, area exists. POST checks field validation, then the email, then the area.
 
+## Vehicles
+
+| Method | Endpoint | Allowed role | Request | Success |
+|--------|----------|--------------|---------|---------|
+| GET | `/vehicle-t6/vehicles/options` | admin, area_admin | none | `200`, `{ "makes": [...], "modelsByMake": { ... } }` |
+| GET | `/vehicle-t6/vehicles` | admin, area_admin | none | `200`, array of Vehicle objects in the caller's scope, sorted by `make`, then `model`, then `id` |
+| POST | `/vehicle-t6/vehicles` | admin, area_admin | Vehicle fields | `201`, new Vehicle object |
+| PUT | `/vehicle-t6/vehicles/:id` | admin, or area_admin for an in-scope vehicle | Vehicle fields (complete replacement) | `200`, updated Vehicle object |
+| DELETE | `/vehicle-t6/vehicles/:id` | admin, or area_admin for an in-scope vehicle | none | `200`, `{ "message": "Vehicle deleted." }` |
+
+Vehicle fields: `{ "make", "model", "year", "vin", "purchasedDate", "color", "passengers", "plateNumber", "plateExpireMonth", "designatedParking", "areaId" }`. Vehicle object: those fields plus generated `id`. `vin` is returned uppercase. Other body properties are ignored. Make and model must come from the standard lists; model must belong to the selected make. No GET-by-id endpoint exists.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Invalid field, make/model pair, date, month, year, or passengers | 400 | `Invalid vehicle data.` |
+| Route id not a positive safe integer | 400 | `Vehicle id must be a positive integer.` |
+| Disallowed role, or area_admin writing another area on create/update body | 403 | `Forbidden.` |
+| Missing area on create/update | 404 | `Area with id=<id> not found.` |
+| Missing or out-of-scope vehicle | 404 | `Vehicle with id=<id> not found.` |
+| VIN already used (case-insensitive) by another vehicle | 409 | `VIN is already in use.` |
+| Database failure | 500 | `Vehicle request failed.` |
+
+
 ## Provenance
 
 | Area | Introduced |
@@ -85,3 +108,4 @@ PUT checks in this order: route id, target exists, area-admin limits, own admin 
 | Login, current account, logout | Feature 1 |
 | Areas list, create, update, delete | Feature 2 |
 | Users list, create, update, delete | Feature 3 |
+| Vehicles options, list, create, update, delete | Feature 4 |

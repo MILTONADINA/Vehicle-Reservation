@@ -17,5 +17,6 @@ describe("Schema sync", () => {
     expect(await uniqueIndexCount("users", "googleSub")).toBe(1);
     expect(await uniqueIndexCount("sessions", "token")).toBe(1);
     expect(await uniqueIndexCount("areas", "areaName")).toBe(1);
+    expect(await uniqueIndexCount("vehicles", "vin")).toBe(1);
   });
 });
