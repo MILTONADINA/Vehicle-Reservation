@@ -410,27 +410,48 @@ controller.changeStatus = async (req, res) => {
       if (vehicleId === null) {
         return res.status(400).send({ message: "Invalid reservation request data." });
       }
-      const vehicle = await db.vehicle.findByPk(vehicleId);
-      if (!vehicle) {
-        return res.status(404).send({ message: `Vehicle with id=${vehicleId} not found.` });
-      }
 
-      // Wrap candidate check + status update in a transaction that locks the vehicle row
+      // Candidate check + status update under one transaction that locks the request
+      // and vehicle rows so concurrent reserves cannot double-book (FR-013).
       const result = await db.sequelize.transaction(async (t) => {
-        await db.vehicle.findByPk(vehicleId, { lock: t.LOCK.UPDATE, transaction: t });
-        const candidates = await findCandidateVehicles(reservationRequest, t);
+        const lockedRequest = await db.reservationRequest.findOne({
+          where: { id, ...scope },
+          lock: t.LOCK.UPDATE,
+          transaction: t,
+        });
+        if (!lockedRequest) return { kind: "not_found" };
+
+        const allowedNow = ADMIN_TRANSITIONS[lockedRequest.status];
+        if (!allowedNow || !allowedNow.has("reserved")) {
+          return { kind: "invalid" };
+        }
+
+        const vehicle = await db.vehicle.findByPk(vehicleId, {
+          lock: t.LOCK.UPDATE,
+          transaction: t,
+        });
+        if (!vehicle) return { kind: "vehicle_not_found" };
+
+        const candidates = await findCandidateVehicles(lockedRequest, t);
         const isCandidate = candidates.some((c) => c.id === vehicleId);
-        if (!isCandidate) return null;
-        return changeReservationRequestStatus(id, newStatus, scope, {
+        if (!isCandidate) return { kind: "invalid" };
+
+        const updated = await changeReservationRequestStatus(id, newStatus, scope, {
           vehicleId,
           transaction: t,
         });
+        if (!updated) return { kind: "invalid" };
+        return { kind: "ok", updated };
       });
 
-      if (!result) {
+      if (result.kind === "not_found") return notFound(res, id);
+      if (result.kind === "vehicle_not_found") {
+        return res.status(404).send({ message: `Vehicle with id=${vehicleId} not found.` });
+      }
+      if (result.kind === "invalid") {
         return res.status(400).send({ message: "Invalid reservation request data." });
       }
-      return res.status(200).send(requestPayload(result));
+      return res.status(200).send(requestPayload(result.updated));
     }
 
     if (newStatus === "cancelled") {

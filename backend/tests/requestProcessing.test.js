@@ -618,6 +618,48 @@ describe("Feature 8 — Request Processing", () => {
       expect(unchanged.status).toBe("requested");
     });
 
+    it("Reserve locks the request and vehicle rows in one transaction", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+      const vehicle = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "awaiting_vehicle",
+        passengers: 4,
+      });
+
+      const txnSpy = jest.spyOn(db.sequelize, "transaction");
+      const requestFindSpy = jest.spyOn(db.reservationRequest, "findOne");
+      const vehicleFindSpy = jest.spyOn(db.vehicle, "findByPk");
+
+      const response = await changeStatus(adminToken, r1.id, {
+        status: "reserved",
+        vehicleId: vehicle.id,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("reserved");
+      expect(response.body.vehicleId).toBe(vehicle.id);
+      expect(txnSpy).toHaveBeenCalled();
+
+      const lockedRequestCall = requestFindSpy.mock.calls.find(
+        (call) => call[0]?.lock === db.Sequelize.Transaction.LOCK.UPDATE,
+      );
+      expect(lockedRequestCall).toBeTruthy();
+      expect(lockedRequestCall[0].transaction).toBeTruthy();
+
+      const lockedVehicleCall = vehicleFindSpy.mock.calls.find(
+        (call) => call[0] === vehicle.id && call[1]?.lock === db.Sequelize.Transaction.LOCK.UPDATE,
+      );
+      expect(lockedVehicleCall).toBeTruthy();
+      expect(lockedVehicleCall[1].transaction).toBeTruthy();
+
+      txnSpy.mockRestore();
+      requestFindSpy.mockRestore();
+      vehicleFindSpy.mockRestore();
+    });
+
     it("Area admin cannot change status for another area request", async () => {
       const { user: reqUser } = await signInAs("requestor");
       const { token: aaToken } = await signInAs("area_admin", { areaId: area2.id });
