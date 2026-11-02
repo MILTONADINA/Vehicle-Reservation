@@ -225,9 +225,9 @@ controller.list = async (req, res) => {
 };
 
 controller.create = async (req, res) => {
-  const result = await validateWritableFields(req.body);
-  if (result.error) return res.status(result.status).send({ message: result.message });
   try {
+    const result = await validateWritableFields(req.body);
+    if (result.error) return res.status(result.status).send({ message: result.message });
     const request = await db.reservationRequest.create({
       ...result,
       requestorUserId: req.user.id,
@@ -243,10 +243,10 @@ controller.update = async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) return invalidRouteId(res);
 
-  const result = await validateWritableFields(req.body);
-  if (result.error) return res.status(result.status).send({ message: result.message });
-
   try {
+    const result = await validateWritableFields(req.body);
+    if (result.error) return res.status(result.status).send({ message: result.message });
+
     const request = await db.reservationRequest.findOne({
       where: { id, requestorUserId: req.user.id, status: "requested" },
     });

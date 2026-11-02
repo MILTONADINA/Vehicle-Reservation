@@ -89,17 +89,22 @@ async function load() {
   loading.value = true;
   loadError.value = "";
   try {
-    const [reqResult, areaResult, driverResult, destResult] = await Promise.all([
-      ReservationRequestServices.getAll(),
-      AreaServices.getAll(),
-      DriverServices.getAll(),
-      DestinationServices.getAll(),
-    ]);
+    // Load the request list on its own so a catalog failure cannot hide a successful list (FR-023).
+    const reqResult = await ReservationRequestServices.getAll();
     requests.value = reqResult.data;
-    areas.value = areaResult.data;
-    drivers.value = driverResult.data;
-    destinations.value = destResult.data;
     loaded.value = true;
+    try {
+      const [areaResult, driverResult, destResult] = await Promise.all([
+        AreaServices.getAll(),
+        DriverServices.getAll(),
+        DestinationServices.getAll(),
+      ]);
+      areas.value = areaResult.data;
+      drivers.value = driverResult.data;
+      destinations.value = destResult.data;
+    } catch {
+      // Display names fall back to ids when catalogs cannot load.
+    }
   } catch (reason) {
     loadError.value = reason.response?.data?.message || "Reservation requests could not be loaded.";
   } finally {

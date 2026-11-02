@@ -102,6 +102,8 @@ const requestPayload = (row) => ({
   noteText: row.noteText,
   status: row.status,
 });
+const snapshot = async () =>
+  (await db.reservationRequest.findAll({ order: [["id", "ASC"]] })).map(requestPayload);
 
 beforeEach(async () => {
   await syncTestDatabase();
@@ -409,6 +411,66 @@ describe("Feature 7 — Reservation Requests", () => {
         expect(response.status).toBe(403);
         expect(response.body).toEqual({ message: "Forbidden." });
       }
+      expect(await db.reservationRequest.count()).toBe(0);
+    });
+
+    it("Oversized reservation request fields are rejected", async () => {
+      const { token } = await signInAs("requestor");
+      for (const body of [
+        validCatalogBody({ purpose: "a".repeat(501) }),
+        validFreetextBody({ destinationCity: "a".repeat(101) }),
+        validCatalogBody({ noteType: "general", noteText: "a".repeat(1001) }),
+        validFreetextBody({ estimatedMiles: 0 }),
+        validFreetextBody({ estimatedMiles: -1 }),
+        validFreetextBody({ estimatedMiles: 10000 }),
+        validFreetextBody({ estimatedMiles: 12.34 }),
+      ]) {
+        const response = await createRequest(token, body);
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: "Invalid reservation request data." });
+      }
+      expect(await db.reservationRequest.count()).toBe(0);
+    });
+
+    it("Reservation request storage failures return a safe error", async () => {
+      const { user, token } = await signInAs("requestor");
+      const existing = await db.reservationRequest.create({
+        ...validCatalogBody(),
+        requestorUserId: user.id,
+        status: "requested",
+      });
+      const before = await snapshot();
+      // Install each spy immediately before its request so later Once spies do not overwrite earlier ones.
+      const failures = [
+        [() => jest.spyOn(db.reservationRequest, "findAll").mockRejectedValueOnce(new Error("connection lost")), () => listRequests(token)],
+        [() => jest.spyOn(db.reservationRequest, "create").mockRejectedValueOnce(new Error("connection lost")), () => createRequest(token, validFreetextBody())],
+        [() => jest.spyOn(db.reservationRequest, "findOne").mockRejectedValueOnce(new Error("connection lost")), () => updateRequest(token, existing.id, validFreetextBody())],
+        [() => jest.spyOn(db.reservationRequest, "findOne").mockRejectedValueOnce(new Error("connection lost")), () => cancelRequest(token, existing.id)],
+        [() => jest.spyOn(db.area, "findByPk").mockRejectedValueOnce(new Error("connection lost")), () => createRequest(token, validCatalogBody())],
+      ];
+      for (const [installSpy, run] of failures) {
+        const spy = installSpy();
+        const response = await run();
+        spy.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ message: "Reservation request failed." });
+      }
+      expect(await snapshot()).toEqual(before);
+    });
+
+    it("Missing driver on reservation request is rejected", async () => {
+      const { token } = await signInAs("requestor");
+      const response = await createRequest(token, validCatalogBody({ driverId: 9999 }));
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ message: "Driver with id=9999 not found." });
+      expect(await db.reservationRequest.count()).toBe(0);
+    });
+
+    it("Missing destination on reservation request is rejected", async () => {
+      const { token } = await signInAs("requestor");
+      const response = await createRequest(token, validCatalogBody({ destinationId: 9999 }));
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ message: "Destination with id=9999 not found." });
       expect(await db.reservationRequest.count()).toBe(0);
     });
 
