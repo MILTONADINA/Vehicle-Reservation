@@ -305,10 +305,11 @@ function scopeFilter(user) {
   return { areaId: user.areaId };
 }
 
-async function findCandidateVehicles(reservationRequest) {
+async function findCandidateVehicles(reservationRequest, transaction = null) {
   const { Op } = db.Sequelize;
   const reqAreaId = reservationRequest.areaId;
   const reqPassengers = reservationRequest.passengers;
+  const txnOpt = transaction ? { transaction } : {};
 
   const depDate = reservationRequest.departureDate;
   const depTime = reservationRequest.departureTime || "00:00";
@@ -323,9 +324,10 @@ async function findCandidateVehicles(reservationRequest) {
       status: { [Op.in]: ["reserved", "returned"] },
       id: { [Op.ne]: reservationRequest.id },
     },
+    ...txnOpt,
   });
 
-  // Filter overlapping in JS using date/time comparison
+  // Filter overlapping in JS using date/time comparison (adjacent end==start does not overlap)
   const blockedVehicleIds = new Set();
   for (const other of overlapping) {
     const oDepDate = other.departureDate;
@@ -354,6 +356,7 @@ async function findCandidateVehicles(reservationRequest) {
   const vehicles = await db.vehicle.findAll({
     where: vehicleWhere,
     order: [["make", "ASC"], ["model", "ASC"], ["id", "ASC"]],
+    ...txnOpt,
   });
 
   return vehicles.map(vehiclePayload);
@@ -411,21 +414,36 @@ controller.changeStatus = async (req, res) => {
       if (!vehicle) {
         return res.status(404).send({ message: `Vehicle with id=${vehicleId} not found.` });
       }
-      // Validate candidate: area, capacity, overlap
-      const candidates = await findCandidateVehicles(reservationRequest);
-      const isCandidate = candidates.some((c) => c.id === vehicleId);
-      if (!isCandidate) {
+
+      // Wrap candidate check + status update in a transaction that locks the vehicle row
+      const result = await db.sequelize.transaction(async (t) => {
+        await db.vehicle.findByPk(vehicleId, { lock: t.LOCK.UPDATE, transaction: t });
+        const candidates = await findCandidateVehicles(reservationRequest, t);
+        const isCandidate = candidates.some((c) => c.id === vehicleId);
+        if (!isCandidate) return null;
+        return changeReservationRequestStatus(id, newStatus, scope, {
+          vehicleId,
+          transaction: t,
+        });
+      });
+
+      if (!result) {
         return res.status(400).send({ message: "Invalid reservation request data." });
       }
+      return res.status(200).send(requestPayload(result));
     }
 
     if (newStatus === "cancelled") {
       const rawReason = req.body?.statusReason;
       if (rawReason !== null && rawReason !== undefined) {
-        if (typeof rawReason === "string") {
-          const trimmedReason = rawReason.trim();
-          statusReason = trimmedReason.length > 0 && trimmedReason.length <= 500 ? trimmedReason : null;
+        if (typeof rawReason !== "string") {
+          return res.status(400).send({ message: "Invalid reservation request data." });
         }
+        const trimmedReason = rawReason.trim();
+        if (trimmedReason.length > 500) {
+          return res.status(400).send({ message: "Invalid reservation request data." });
+        }
+        statusReason = trimmedReason.length > 0 ? trimmedReason : null;
       }
     }
 

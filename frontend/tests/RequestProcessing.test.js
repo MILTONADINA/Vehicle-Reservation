@@ -271,4 +271,32 @@ describe("Feature 8 — Request Processing", () => {
     expect(dialogOpen("status-dialog")).toBe(false);
     expect(rows(wrapper)).toHaveLength(1);
   });
+
+  it("Status form rejects invalid fields before submitting", async () => {
+    const wrapper = await openRequests("admin", null, [reqRequested]);
+    ReservationRequestServices.getCandidateVehicles.mockResolvedValue({ data: [candidateVeh] });
+
+    await rows(wrapper)[0].find('[data-testid="status-change"]').trigger("click");
+    await flushPromises();
+    await choose("status-select", "reserved");
+    await flushPromises();
+
+    await click("save-status");
+    expect(bodyText()).toContain("Invalid reservation request data.");
+    expect(dialogOpen("status-dialog")).toBe(true);
+    expect(ReservationRequestServices.changeStatus).not.toHaveBeenCalled();
+  });
+
+  it("Candidate vehicle load failure shows an error", async () => {
+    const wrapper = await openRequests("admin", null, [reqRequested]);
+    ReservationRequestServices.getCandidateVehicles.mockRejectedValueOnce(apiError(500, "Reservation request failed."));
+
+    await rows(wrapper)[0].find('[data-testid="status-change"]').trigger("click");
+    await flushPromises();
+    await choose("status-select", "reserved");
+    await flushPromises();
+
+    expect(bodyText()).toContain("Reservation request failed.");
+    expect(dialogOpen("status-dialog")).toBe(true);
+  });
 });

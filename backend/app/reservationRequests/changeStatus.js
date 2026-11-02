@@ -16,11 +16,12 @@ const TRANSITIONS = {
  * @param {number} id - reservation request id
  * @param {string} newStatus - target status
  * @param {object} [where] - additional Sequelize where conditions (e.g. ownership)
- * @param {object} [extras] - optional { vehicleId, statusReason } for admin transitions
+ * @param {object} [extras] - optional { vehicleId, statusReason, transaction } for admin transitions
  * @returns {object|null} the updated reservationRequest instance, or null if not found / not allowed
  */
 export async function changeReservationRequestStatus(id, newStatus, where = {}, extras = {}) {
-  const request = await db.reservationRequest.findOne({ where: { id, ...where } });
+  const txn = extras.transaction || null;
+  const request = await db.reservationRequest.findOne({ where: { id, ...where }, ...(txn ? { transaction: txn } : {}) });
   if (!request) return null;
 
   const allowed = TRANSITIONS[request.status];
@@ -46,6 +47,6 @@ export async function changeReservationRequestStatus(id, newStatus, where = {}, 
     // Feature 7 requestor cancel path: no extras passed, leave vehicleId/statusReason alone (null)
   }
 
-  await request.update(update);
+  await request.update(update, txn ? { transaction: txn } : {});
   return request;
 }

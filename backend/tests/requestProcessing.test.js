@@ -2,6 +2,7 @@
  * Feature 8 — Request Processing
  * Spec: features/feature-8-request-processing.md
  */
+import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../server.js";
 import db from "../app/models/index.js";
@@ -46,21 +47,24 @@ const makeDestination = (overrides = {}) =>
     ...overrides,
   });
 
-const makeVehicle = (overrides = {}) =>
-  db.vehicle.create({
+let vehicleCounter = 0;
+const makeVehicle = (overrides = {}) => {
+  vehicleCounter += 1;
+  return db.vehicle.create({
     make: "Toyota",
     model: "Sienna",
     year: 2024,
-    vin: `VIN${Date.now()}${Math.random()}`.replace(/[^A-Z0-9]/gi, "").substring(0, 17).toUpperCase(),
+    vin: `VIN${String(vehicleCounter).padStart(14, "0")}`,
     purchasedDate: "2024-01-01",
     color: "White",
     passengers: 8,
-    plateNumber: `PLT${Date.now()}`.substring(0, 10),
+    plateNumber: `PLT${String(vehicleCounter).padStart(7, "0")}`,
     plateExpireMonth: 6,
     designatedParking: "Lot A",
     areaId: area1 ? area1.id : 1,
     ...overrides,
   });
+};
 
 const makeRequest = (overrides = {}) =>
   db.reservationRequest.create({
@@ -83,6 +87,7 @@ const makeRequest = (overrides = {}) =>
   });
 
 beforeEach(async () => {
+  vehicleCounter = 0;
   await syncTestDatabase();
   area1 = await makeArea({ areaName: "Area 1" });
   area2 = await makeArea({ areaName: "Area 2" });
@@ -650,6 +655,185 @@ describe("Feature 8 — Request Processing", () => {
 
       expect(await db.vehicle.findByPk(v12.id)).not.toBeNull();
       expect(await db.reservationRequest.count()).toBe(1);
+    });
+
+    it("Returned trips still block their vehicle from candidates", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+
+      const vehicle = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "returned",
+        vehicleId: vehicle.id,
+        departureDate: "2026-12-10",
+        departureTime: "08:00",
+        returnDate: "2026-12-10",
+        returnTime: "17:00",
+      });
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "requested",
+        passengers: 4,
+        departureDate: "2026-12-10",
+        departureTime: "10:00",
+        returnDate: "2026-12-10",
+        returnTime: "14:00",
+      });
+
+      const candidates = await getCandidates(adminToken, r1.id);
+      expect(candidates.status).toBe(200);
+      expect(candidates.body.map((v) => v.id)).not.toContain(vehicle.id);
+
+      const reserve = await changeStatus(adminToken, r1.id, { status: "reserved", vehicleId: vehicle.id });
+      expect(reserve.status).toBe(400);
+      expect(reserve.body).toEqual({ message: "Invalid reservation request data." });
+    });
+
+    it("Adjacent trips that meet exactly at an endpoint do not overlap", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+
+      const vehicle = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "reserved",
+        vehicleId: vehicle.id,
+        departureDate: "2026-12-10",
+        departureTime: "08:00",
+        returnDate: "2026-12-10",
+        returnTime: "12:00",
+      });
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "requested",
+        passengers: 4,
+        departureDate: "2026-12-10",
+        departureTime: "12:00",
+        returnDate: "2026-12-10",
+        returnTime: "17:00",
+      });
+
+      const candidates = await getCandidates(adminToken, r1.id);
+      expect(candidates.status).toBe(200);
+      expect(candidates.body.map((v) => v.id)).toContain(vehicle.id);
+
+      const reserve = await changeStatus(adminToken, r1.id, { status: "reserved", vehicleId: vehicle.id });
+      expect(reserve.status).toBe(200);
+      expect(reserve.body.vehicleId).toBe(vehicle.id);
+    });
+
+    it("Whole-day trips block their vehicle through 23:59", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+
+      const vehicle = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "reserved",
+        vehicleId: vehicle.id,
+        departureDate: "2026-12-10",
+        departureTime: null,
+        returnDate: "2026-12-10",
+        returnTime: null,
+      });
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "requested",
+        passengers: 4,
+        departureDate: "2026-12-10",
+        departureTime: "22:00",
+        returnDate: "2026-12-10",
+        returnTime: "23:00",
+      });
+
+      const candidates = await getCandidates(adminToken, r1.id);
+      expect(candidates.status).toBe(200);
+      expect(candidates.body.map((v) => v.id)).not.toContain(vehicle.id);
+    });
+
+    it("Oversized or non-string statusReason is rejected", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "awaiting_vehicle",
+      });
+
+      for (const statusReason of ["a".repeat(501), 42]) {
+        const response = await changeStatus(adminToken, r1.id, { status: "cancelled", statusReason });
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: "Invalid reservation request data." });
+      }
+
+      const unchanged = await db.reservationRequest.findByPk(r1.id);
+      expect(unchanged.status).toBe("awaiting_vehicle");
+      expect(unchanged.statusReason).toBeNull();
+    });
+
+    it("Status reason is trimmed on cancel", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "awaiting_vehicle",
+      });
+
+      const response = await changeStatus(adminToken, r1.id, {
+        status: "cancelled",
+        statusReason: "  Traveler withdrew.  ",
+      });
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("cancelled");
+      expect(response.body.statusReason).toBe("Traveler withdrew.");
+    });
+
+    it("Storage failures on candidate-vehicles and status-change return 500", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+
+      const vehicle = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      const r1 = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "requested",
+        passengers: 4,
+      });
+
+      const failures = [
+        [
+          () => jest.spyOn(db.reservationRequest, "findAll").mockRejectedValueOnce(new Error("connection lost")),
+          () => getCandidates(adminToken, r1.id),
+        ],
+        [
+          () => jest.spyOn(db.reservationRequest, "findOne").mockRejectedValueOnce(new Error("connection lost")),
+          () => changeStatus(adminToken, r1.id, { status: "awaiting_vehicle" }),
+        ],
+        [
+          () => jest.spyOn(db.vehicle, "findByPk").mockRejectedValueOnce(new Error("connection lost")),
+          () => changeStatus(adminToken, r1.id, { status: "reserved", vehicleId: vehicle.id }),
+        ],
+      ];
+
+      for (const [installSpy, run] of failures) {
+        const spy = installSpy();
+        const response = await run();
+        spy.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ message: "Reservation request failed." });
+      }
+
+      const unchanged = await db.reservationRequest.findByPk(r1.id);
+      expect(unchanged.status).toBe("requested");
+      expect(unchanged.vehicleId).toBeNull();
     });
 
     it("Invalid reservation request route id is rejected on status change", async () => {

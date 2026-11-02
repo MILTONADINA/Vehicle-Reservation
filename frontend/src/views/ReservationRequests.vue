@@ -387,11 +387,13 @@ function openMarkReturned(req) {
 
 async function loadCandidates(requestId) {
   loadingCandidates.value = true;
+  statusDialog.error = "";
   try {
     const result = await ReservationRequestServices.getCandidateVehicles(requestId);
     candidateVehicles.value = result.data;
-  } catch {
+  } catch (reason) {
     candidateVehicles.value = [];
+    statusDialog.error = reason.response?.data?.message || "Candidate vehicles could not be loaded.";
   } finally {
     loadingCandidates.value = false;
   }
@@ -419,6 +421,23 @@ function cancelStatusDialog() {
 
 async function saveStatus() {
   if (statusDialog.saving) return;
+
+  // Client-side validation before API call
+  if (!statusDialog.form.status) {
+    statusDialog.error = INVALID;
+    return;
+  }
+  if (statusDialog.form.status === "reserved" && !statusDialog.form.vehicleId) {
+    statusDialog.error = INVALID;
+    return;
+  }
+  if (statusDialog.form.statusReason != null && statusDialog.form.statusReason !== "") {
+    const trimmedLen = typeof statusDialog.form.statusReason === "string" ? statusDialog.form.statusReason.trim().length : -1;
+    if (trimmedLen < 0 || trimmedLen > 500) {
+      statusDialog.error = INVALID;
+      return;
+    }
+  }
 
   const data = { status: statusDialog.form.status };
 

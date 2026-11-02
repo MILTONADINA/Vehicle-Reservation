@@ -235,6 +235,26 @@ Register ReservationRequest belongsTo Vehicle. Do not remove Feature 7 associati
 * **When** the admin chooses status Reserved
 * **Then** the status-change dialog loads candidate vehicles into the Vehicle combo box
 
+#### Scenario: Returned trips still block their vehicle from candidates
+* **Given** vehicle 9 is on a returned trip that overlaps request id 1
+* **When** candidate vehicles are requested for request 1
+* **Then** vehicle 9 is not included and reserving it is rejected
+
+#### Scenario: Adjacent trips that meet exactly at an endpoint do not overlap
+* **Given** vehicle 9 is reserved until 12:00 and request id 1 starts at 12:00 the same day
+* **When** candidate vehicles are requested for request 1
+* **Then** vehicle 9 is included and can be reserved
+
+#### Scenario: Whole-day trips block their vehicle through 23:59
+* **Given** vehicle 9 is reserved as a whole-day trip on the same date as request id 1
+* **When** candidate vehicles are requested for a late-evening timed request that day
+* **Then** vehicle 9 is not included
+
+#### Scenario: Candidate vehicle load failure shows an error
+* **Given** the status-change dialog is open and candidate loading fails
+* **When** the admin chooses status Reserved
+* **Then** the dialog shows the API message or Candidate vehicles could not be loaded.
+
 ### US-8.3 — Change reservation request status
 
 #### Scenario: Admin moves a requested trip to awaiting vehicle
@@ -327,6 +347,26 @@ Register ReservationRequest belongsTo Vehicle. Do not remove Feature 7 associati
 * **When** the user selects Cancel
 * **Then** no status-change request is sent and the reservation request is unchanged
 
+#### Scenario: Storage failures on candidate-vehicles and status-change return 500
+* **Given** an authorized candidate-vehicles or status-change call encounters a database failure
+* **When** each operation is attempted
+* **Then** each response is 500 with message Reservation request failed. and unsuccessful writes leave status and vehicle assignment unchanged
+
+#### Scenario: Oversized or non-string statusReason is rejected
+* **Given** an admin posts status cancelled with statusReason longer than 500 characters or a non-string value
+* **When** PUT /vehicle-t6/reservation-requests/:id/status is sent
+* **Then** the response is 400 with message Invalid reservation request data. and the request is unchanged
+
+#### Scenario: Status reason is trimmed on cancel
+* **Given** an admin cancels with statusReason surrounded by spaces
+* **When** the status change succeeds
+* **Then** the stored statusReason has outer spaces removed
+
+#### Scenario: Status form rejects invalid fields before submitting
+* **Given** Reserved is chosen without a vehicle or Status is blank
+* **When** the user selects Save
+* **Then** no status-change request is sent and Invalid reservation request data. is shown
+
 ## Test Coverage Map
 
 Exact `it(...)` titles. Backend file: `backend/tests/requestProcessing.test.js`. Frontend file: `frontend/tests/RequestProcessing.test.js`.
@@ -348,6 +388,10 @@ Exact `it(...)` titles. Backend file: `backend/tests/requestProcessing.test.js`.
 | US-8.2 | Candidate vehicles for a non-reservable status are rejected | `backend/tests/requestProcessing.test.js` | `it("Candidate vehicles for a non-reservable status are rejected")` |
 | US-8.2 | Area admin cannot load candidates for another area request | `backend/tests/requestProcessing.test.js` | `it("Area admin cannot load candidates for another area request")` |
 | US-8.2 | Reserve dialog loads candidate vehicles | `frontend/tests/RequestProcessing.test.js` | `it("Reserve dialog loads candidate vehicles")` |
+| US-8.2 | Returned trips still block their vehicle from candidates | `backend/tests/requestProcessing.test.js` | `it("Returned trips still block their vehicle from candidates")` |
+| US-8.2 | Adjacent trips that meet exactly at an endpoint do not overlap | `backend/tests/requestProcessing.test.js` | `it("Adjacent trips that meet exactly at an endpoint do not overlap")` |
+| US-8.2 | Whole-day trips block their vehicle through 23:59 | `backend/tests/requestProcessing.test.js` | `it("Whole-day trips block their vehicle through 23:59")` |
+| US-8.2 | Candidate vehicle load failure shows an error | `frontend/tests/RequestProcessing.test.js` | `it("Candidate vehicle load failure shows an error")` |
 | US-8.3 | Admin moves a requested trip to awaiting vehicle | `backend/tests/requestProcessing.test.js` | `it("Admin moves a requested trip to awaiting vehicle")` |
 | US-8.3 | Admin reserves a requested trip with a valid vehicle | `backend/tests/requestProcessing.test.js` | `it("Admin reserves a requested trip with a valid vehicle")` |
 | US-8.3 | Admin reserves a trip with a valid vehicle | `backend/tests/requestProcessing.test.js` | `it("Admin reserves a trip with a valid vehicle")` |
@@ -363,9 +407,13 @@ Exact `it(...)` titles. Backend file: `backend/tests/requestProcessing.test.js`.
 | US-8.3 | Area admin cannot change status for another area request | `backend/tests/requestProcessing.test.js` | `it("Area admin cannot change status for another area request")` |
 | US-8.3 | Referenced vehicle cannot be deleted while in use | `backend/tests/requestProcessing.test.js` | `it("Referenced vehicle cannot be deleted while in use")` |
 | US-8.3 | Invalid reservation request route id is rejected on status change | `backend/tests/requestProcessing.test.js` | `it("Invalid reservation request route id is rejected on status change")` |
+| US-8.3 | Storage failures on candidate-vehicles and status-change return 500 | `backend/tests/requestProcessing.test.js` | `it("Storage failures on candidate-vehicles and status-change return 500")` |
+| US-8.3 | Oversized or non-string statusReason is rejected | `backend/tests/requestProcessing.test.js` | `it("Oversized or non-string statusReason is rejected")` |
+| US-8.3 | Status reason is trimmed on cancel | `backend/tests/requestProcessing.test.js` | `it("Status reason is trimmed on cancel")` |
 | US-8.3 | Saving a status change refreshes the list | `frontend/tests/RequestProcessing.test.js` | `it("Saving a status change refreshes the list")` |
 | US-8.3 | Failed status change keeps the dialog open | `frontend/tests/RequestProcessing.test.js` | `it("Failed status change keeps the dialog open")` |
 | US-8.3 | Cancel closes status change without a request | `frontend/tests/RequestProcessing.test.js` | `it("Cancel closes status change without a request")` |
+| US-8.3 | Status form rejects invalid fields before submitting | `frontend/tests/RequestProcessing.test.js` | `it("Status form rejects invalid fields before submitting")` |
 
 ## Agent implementation request
 
