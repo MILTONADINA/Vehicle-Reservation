@@ -151,3 +151,33 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Destination could not be saved.`; Cancel discards values and errors | `Destinations.vue` `save()`, `cancelDialog()` | Feature 6 |
 | Delete asks `Delete this destination?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Destination could not be deleted.` | `Destinations.vue` `confirmDelete()` | Feature 6 |
 
+## Reservation requests
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Only requestor, admin, and area_admin may access reservation-request endpoints; maintenance gets 403 | `reservationRequest.routes.js` `requireRole` | Feature 7 |
+| List scope: requestor sees only own requests (`requestorUserId = session user`); area_admin sees only requests for own database `areaId` (empty `[]` if null); admin sees all; sorted by `departureDate` ASC, `departureTime` ASC (nulls first), then `id` ASC | `reservationRequest.controller.js` `list` | Feature 7 |
+| Only requestor may create, update, or cancel; admin and area_admin get 403 for POST, PUT, and cancel | `reservationRequest.routes.js` `requireRole("requestor")` | Feature 7 |
+| Create sets `requestorUserId` from the session and `status` to `requested`; client-supplied values for both are ignored | `controller.create` | Feature 7 |
+| Update and cancel are allowed only for the requestor's own `requested` rows; non-owned or non-requested targets return 404 without revealing other users' data | `controller.update`, `controller.cancel` | Feature 7 |
+| Cancel uses the shared status-change function (`changeReservationRequestStatus`) defined in Feature 8 so Feature 9 can email on requestor cancels; the row is kept with status `cancelled` | `controller.cancel` calls `changeReservationRequestStatus(id, "cancelled", ...)` | Feature 7 |
+| Destination mode: exactly one of (a) catalog `destinationId` with null `destinationCity`/`estimatedMiles`, or (b) free-text `destinationCity`/`estimatedMiles` with null `destinationId`; mixed or absent is 400 | `validateWritableFields()` | Feature 7 |
+| Catalog destination must be `active`; driver must be `approved`; area must exist; inactive/missing references are rejected | `validateWritableFields()` | Feature 7 |
+| Schedule: dates required `YYYY-MM-DD`; times optional as a pair (both null for whole-day, both present as `HH:mm` for timed); whole-day requires `returnDate >= departureDate`; timed requires combined return strictly after combined departure | `validateWritableFields()` | Feature 7 |
+| Passengers 1–15; purpose trimmed nonblank ≤ 500 chars; notes optional pair (`noteType` + `noteText`); noteType in `general`, `special_instructions`, `other`; noteText trimmed nonblank ≤ 1000 chars | `validateWritableFields()` | Feature 7 |
+| Route ids must be positive safe integers; PUT replaces writable fields and keeps `id`, `requestorUserId`, `status` | `controller.update` | Feature 7 |
+| Foreign keys from `reservation_requests` to users, areas, drivers, and destinations use `ON DELETE RESTRICT`; deleting a referenced record returns 409 `Area is in use.` / `Driver is in use.` / `Destination is in use.` | `models/index.js` associations | Feature 7 |
+
+## Reservation requests screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| `/reservation-requests` (heading **Reservation requests**) is linked from MenuBar (**Requests**) for requestor, admin, and area_admin; signed-out visitors go to Login; maintenance is sent Home | `router.js` `meta.roles`, `MenuBar.vue` | Feature 7 |
+| Columns: Departure, Return, Area, Driver, Destination, Miles, Passengers, Purpose, Notes, Status, Actions; Destination shows `destinationName` (catalog) or `destinationCity` (free-text); Miles shows `roundTripMiles` (catalog) or `estimatedMiles` (free-text); Area and Driver names resolved client-side from loaded catalogs | `views/ReservationRequests.vue` | Feature 7 |
+| Requestor sees **Add request** and **Edit** / **Cancel** on own `requested` rows only; admin and area_admin see the list without write actions | `ReservationRequests.vue` `isRequestor` computed | Feature 7 |
+| Progress while loading; `No reservation requests found.` only after a successful empty response; failure shows the API message or `Reservation requests could not be loaded.` | `ReservationRequests.vue` `load()` | Feature 7 |
+| Add/Edit dialog includes Area (from Feature 2 areas), Driver (approved only from Feature 5), destination mode (catalog active destinations from Feature 6, or free-text city + estimated miles), departure/return date and optional time, passengers, purpose, optional note type and text, Save and Cancel | `ReservationRequests.vue` dialog | Feature 7 |
+| Client validation mirrors backend rules; invalid fields show `Invalid reservation request data.` without a write | `ReservationRequests.vue` `validRequestFields()` | Feature 7 |
+| Save shows progress and blocks duplicate submission; success closes dialog and reloads; failure keeps values and shows the API message or `Reservation request could not be saved.`; Cancel discards values and errors | `ReservationRequests.vue` `save()`, `cancelDialog()` | Feature 7 |
+| Cancel confirmation asks `Cancel this reservation request?` with **Cancel request** and **Keep**; Keep sends nothing; confirming shows progress, blocks duplicate, closes on success and reloads; failure keeps dialog and shows the API message or `Reservation request could not be canceled.` | `ReservationRequests.vue` `confirmCancel()`, `keepCancel()` | Feature 7 |
+

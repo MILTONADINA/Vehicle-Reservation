@@ -526,15 +526,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-024** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 7 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-024** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 7 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 

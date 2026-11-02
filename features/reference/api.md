@@ -141,6 +141,34 @@ Destination fields: `{ "destinationName": "Oklahoma City Airport", "addressLine"
 | Duplicate destination name | 409 | `Destination name is already in use.` |
 | Database failure | 500 | `Destination request failed.` |
 
+## Reservation Requests
+
+| Method | Endpoint | Allowed role | Request | Success |
+|--------|----------|--------------|---------|---------|
+| GET | `/vehicle-t6/reservation-requests` | admin, area_admin (scoped), requestor (own) | none | `200`, array of ReservationRequest objects sorted by `departureDate` ASC, `departureTime` ASC (nulls first), then `id` ASC |
+| POST | `/vehicle-t6/reservation-requests` | requestor | ReservationRequest writable fields | `201`, new ReservationRequest with status `requested` |
+| PUT | `/vehicle-t6/reservation-requests/:id` | requestor (own `requested`) | ReservationRequest writable fields (complete replacement) | `200`, updated ReservationRequest |
+| PUT | `/vehicle-t6/reservation-requests/:id/cancel` | requestor (own `requested`) | empty body | `200`, ReservationRequest with status `cancelled` (via shared status-change function) |
+
+Writable fields: `{ "areaId", "driverId", "destinationId", "destinationCity", "estimatedMiles", "departureDate", "departureTime", "returnDate", "returnTime", "passengers", "purpose", "noteType", "noteText" }`. ReservationRequest object: writable fields plus generated `id`, `requestorUserId` (from session), and `status`. Client-supplied `requestorUserId` and `status` are ignored on write. `destinationId` (catalog mode) and `destinationCity`/`estimatedMiles` (free-text mode) are mutually exclusive; providing both or neither is rejected. `departureTime` and `returnTime` are optional as a pair (both null for whole-day trips, or both present as `HH:mm`). `noteType` and `noteText` are optional as a pair. `passengers` is 1–15. `purpose` is trimmed, nonblank, at most 500 characters. No GET-by-id endpoint exists.
+
+List scope: requestor sees only own requests; area_admin sees only requests for own database `areaId` (empty if null); admin sees all. Maintenance gets 403 for every reservation-request endpoint.
+
+Cancel uses the shared status-change function (Feature 8) so Feature 9 can email on requestor cancels. Cancel does not delete the row.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| No valid session | 401 | `Unauthorized.` |
+| Disallowed role or maintenance access | 403 | `Forbidden.` |
+| Invalid field, schedule, destination mode, notes, passengers, or purpose | 400 | `Invalid reservation request data.` |
+| Route id not a positive safe integer | 400 | `Reservation request id must be a positive integer.` |
+| Missing area | 404 | `Area with id=<id> not found.` |
+| Missing driver | 404 | `Driver with id=<id> not found.` |
+| Missing destination | 404 | `Destination with id=<id> not found.` |
+| Missing, non-owned, or non-`requested` target on PUT/cancel | 404 | `Reservation request with id=<id> not found.` |
+| Delete of Area/Driver/Destination still referenced by a reservation request | 409 | `Area is in use.` / `Driver is in use.` / `Destination is in use.` |
+| Database failure | 500 | `Reservation request failed.` |
+
 ## Provenance
 
 | Area | Introduced |
@@ -151,3 +179,4 @@ Destination fields: `{ "destinationName": "Oklahoma City Airport", "addressLine"
 | Vehicles options, list, create, update, delete | Feature 4 |
 | Drivers options, list, create, update, delete | Feature 5 |
 | Destinations options, list, create, update, delete | Feature 6 |
+| Reservation requests list, create, update, cancel | Feature 7 |
