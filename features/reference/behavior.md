@@ -111,3 +111,23 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Vehicle could not be saved.`; Cancel discards values and errors | `Vehicles.vue` `save()`, `cancelDialog()` | Feature 4 |
 | Delete asks `Delete this vehicle?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Vehicle could not be deleted.` | `Vehicles.vue` `confirmDelete()` | Feature 4 |
 
+## Drivers
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Every signed-in role may list drivers and call `/drivers/options`; only admin and area_admin may create, update, or delete | `driver.routes.js` | Feature 5 |
+| Drivers are global with no area filtering; lists sort by `lastName`, then `firstName`, then `id` | `driver.controller.js` `list` | Feature 5 |
+| Names trim outer spaces and keep case; `licenseState` is uppercased and must be on the standard USPS/DC list; dates are `YYYY-MM-DD`; status is `approved` or `inactive`; past expire dates may be saved | `validDriverFields()`, `licenseStates.js` | Feature 5 |
+| Route ids must be positive safe integers; PUT replaces editable fields and keeps `id`; clients cannot choose an id | `parseDriverId()`, `driverPayload()` | Feature 5 |
+
+## Drivers screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| `/drivers` (heading **Drivers**) is linked from MenuBar for admin and area_admin only; signed-out visitors go to Login; requestor and maintenance are sent Home | `router.js` `meta.roles`, `MenuBar.vue` | Feature 5 |
+| Columns: First name, Last name, License state, License expires, Approved, Status, Actions; Add driver, Edit, and Delete for managers | `views/Drivers.vue` | Feature 5 |
+| Progress while loading; `No drivers found.` only after a successful empty response; failure shows the API message or `Drivers could not be loaded.` | `Drivers.vue` `load()` | Feature 5 |
+| Add/Edit dialogs use License state from `/drivers/options`, Status `approved`/`inactive`, Save and Cancel; client validation shows `Invalid driver data.` without a write | `Drivers.vue` | Feature 5 |
+| Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Driver could not be saved.`; Cancel discards values and errors | `Drivers.vue` `save()`, `cancelDialog()` | Feature 5 |
+| Delete asks `Delete this driver?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Driver could not be deleted.` | `Drivers.vue` `confirmDelete()` | Feature 5 |
+

@@ -100,6 +100,25 @@ Vehicle fields: `{ "make", "model", "year", "vin", "purchasedDate", "color", "pa
 | VIN already used (case-insensitive) by another vehicle | 409 | `VIN is already in use.` |
 | Database failure | 500 | `Vehicle request failed.` |
 
+## Drivers
+
+| Method | Endpoint | Allowed role | Request | Success |
+|--------|----------|--------------|---------|---------|
+| GET | `/vehicle-t6/drivers/options` | every signed-in role | none | `200`, `{ "licenseStates": ["AL", "AK", …] }` |
+| GET | `/vehicle-t6/drivers` | every signed-in role | none | `200`, array of Driver objects sorted by `lastName`, then `firstName`, then `id` |
+| POST | `/vehicle-t6/drivers` | admin, area_admin | Driver fields | `201`, new Driver object |
+| PUT | `/vehicle-t6/drivers/:id` | admin, area_admin | Driver fields (complete replacement) | `200`, updated Driver object |
+| DELETE | `/vehicle-t6/drivers/:id` | admin, area_admin | none | `200`, `{ "message": "Driver deleted." }` |
+
+Driver fields: `{ "firstName": "Jordan", "lastName": "Lee", "licenseState": "OK", "licenseExpireDate": "2028-06-30", "approvedDate": "2026-01-15", "status": "approved" }`. Driver object: those fields plus generated `id`. `licenseState` is returned uppercase. Other body properties are ignored. Names are trimmed, nonblank, at most 100 characters, case kept. `licenseState` must be a two-letter USPS state or DC code from the standard list. Dates are required `YYYY-MM-DD` calendar dates (past, present, or future). `status` is `approved` or `inactive`. Drivers are global with no area. No GET-by-id endpoint exists.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Invalid field, date, status, or license state | 400 | `Invalid driver data.` |
+| Route id not a positive safe integer | 400 | `Driver id must be a positive integer.` |
+| Disallowed role for create, update, or delete | 403 | `Forbidden.` |
+| Missing driver | 404 | `Driver with id=<id> not found.` |
+| Database failure | 500 | `Driver request failed.` |
 
 ## Provenance
 
@@ -109,3 +128,4 @@ Vehicle fields: `{ "make", "model", "year", "vin", "purchasedDate", "color", "pa
 | Areas list, create, update, delete | Feature 2 |
 | Users list, create, update, delete | Feature 3 |
 | Vehicles options, list, create, update, delete | Feature 4 |
+| Drivers options, list, create, update, delete | Feature 5 |
