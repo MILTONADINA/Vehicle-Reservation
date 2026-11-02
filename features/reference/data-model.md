@@ -69,6 +69,20 @@
 | status | String(20) | Required; `approved` or `inactive` |
 | createdAt, updatedAt | DateTime | Sequelize timestamps |
 
+### `destinations`
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| destinationName | String(100) | Required; trimmed; nonblank; unique ignoring case; case kept |
+| addressLine | String(200) | Required; trimmed; nonblank; case kept |
+| city | String(100) | Required; trimmed; nonblank; case kept |
+| state | String(2) | Required; uppercase USPS state or DC code from the Feature 6 standard list |
+| zipCode | String(5) | Required; trimmed; exactly 5 digits |
+| roundTripMiles | Decimal(6,1) | Required; greater than 0 and at most 9999.9; at most one decimal digit |
+| status | String(20) | Required; `active` or `inactive` |
+| createdAt, updatedAt | DateTime | Sequelize timestamps |
+
 ## Associations
 
 | Association | Options | Introduced |
@@ -77,7 +91,7 @@
 | `area.hasMany(user, { as: "users" })` / `user.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (nullable), `onDelete: RESTRICT` — an area with assigned users cannot be deleted | Feature 2 |
 | `area.hasMany(vehicle, { as: "vehicles" })` / `vehicle.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (not null), `onDelete: RESTRICT` — an area with vehicles cannot be deleted | Feature 4 |
 
-Drivers have no foreign keys to users, areas, vehicles, or reservations in this feature.
+Drivers have no foreign keys to users, areas, vehicles, or reservations in this feature. Destinations have no foreign keys to users, areas, vehicles, drivers, or reservations in this feature.
 
 ## Provenance
 
@@ -87,3 +101,4 @@ Drivers have no foreign keys to users, areas, vehicles, or reservations in this 
 | areas, users.areaId | Feature 2 |
 | vehicles | Feature 4 |
 | drivers | Feature 5 |
+| destinations | Feature 6 |

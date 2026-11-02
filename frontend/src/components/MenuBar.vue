@@ -12,7 +12,7 @@ const refreshUser = () => { user.value = Utils.getStore("user"); };
 onMounted(() => window.addEventListener("user-logged-in", refreshUser));
 onBeforeUnmount(() => window.removeEventListener("user-logged-in", refreshUser));
 
-// Only the two manager roles see Users, Vehicles, and Drivers; the route guard enforces the same rule.
+// Only the two manager roles see Users, Vehicles, Drivers, and Destinations; the route guard enforces the same rule.
 const canManageUsers = computed(() => ["admin", "area_admin"].includes(user.value?.role));
 
 // Ends the server session, then forgets the local one. An already-invalid session (401)
@@ -40,6 +40,7 @@ async function signOut() {
     <v-btn v-if="canManageUsers" :to="{ name: 'users' }" variant="text" data-testid="nav-users">Users</v-btn>
     <v-btn v-if="canManageUsers" :to="{ name: 'vehicles' }" variant="text" data-testid="nav-vehicles">Vehicles</v-btn>
     <v-btn v-if="canManageUsers" :to="{ name: 'drivers' }" variant="text" data-testid="nav-drivers">Drivers</v-btn>
+    <v-btn v-if="canManageUsers" :to="{ name: 'destinations' }" variant="text" data-testid="nav-destinations">Destinations</v-btn>
     <span class="mx-4" data-testid="signed-in-email">{{ user?.email }}</span>
     <v-btn data-testid="sign-out" variant="text" @click="signOut">Sign out</v-btn>
   </v-app-bar>
