@@ -56,6 +56,19 @@
 | areaId | Integer | Required foreign key to `areas.id`, `ON DELETE RESTRICT` |
 | createdAt, updatedAt | DateTime | Sequelize timestamps |
 
+### `drivers`
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| firstName | String(100) | Required; trimmed; nonblank; case kept |
+| lastName | String(100) | Required; trimmed; nonblank; case kept |
+| licenseState | String(2) | Required; uppercase USPS state or DC code from the Feature 5 standard list |
+| licenseExpireDate | Date only | Required; `YYYY-MM-DD` |
+| approvedDate | Date only | Required; `YYYY-MM-DD` |
+| status | String(20) | Required; `approved` or `inactive` |
+| createdAt, updatedAt | DateTime | Sequelize timestamps |
+
 ## Associations
 
 | Association | Options | Introduced |
@@ -64,6 +77,8 @@
 | `area.hasMany(user, { as: "users" })` / `user.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (nullable), `onDelete: RESTRICT` — an area with assigned users cannot be deleted | Feature 2 |
 | `area.hasMany(vehicle, { as: "vehicles" })` / `vehicle.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (not null), `onDelete: RESTRICT` — an area with vehicles cannot be deleted | Feature 4 |
 
+Drivers have no foreign keys to users, areas, vehicles, or reservations in this feature.
+
 ## Provenance
 
 | Table | Introduced |
@@ -71,3 +86,4 @@
 | users, sessions | Feature 1 |
 | areas, users.areaId | Feature 2 |
 | vehicles | Feature 4 |
+| drivers | Feature 5 |

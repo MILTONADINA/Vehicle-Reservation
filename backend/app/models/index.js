@@ -4,6 +4,7 @@ import userModel from "./user.model.js";
 import sessionModel from "./session.model.js";
 import areaModel from "./area.model.js";
 import vehicleModel from "./vehicle.model.js";
+import driverModel from "./driver.model.js";
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -13,6 +14,7 @@ db.user = userModel(sequelize, Sequelize);
 db.session = sessionModel(sequelize, Sequelize);
 db.area = areaModel(sequelize, Sequelize);
 db.vehicle = vehicleModel(sequelize, Sequelize);
+db.driver = driverModel(sequelize, Sequelize);
 
 // Sessions belong to one user and are deleted with that user.
 const sessionUserKey = { name: "userId", allowNull: false };
