@@ -247,6 +247,39 @@ describe("Feature 6 — Destination Management", () => {
       expect(response.body).not.toHaveProperty("extra");
       expect(Object.keys(response.body).sort()).toEqual(destinationKeys);
     });
+
+    it("Oversized destination fields are rejected", async () => {
+      const { token } = await signInAs("admin");
+      for (const body of [
+        { ...oklahoma, destinationName: "a".repeat(101) },
+        { ...oklahoma, addressLine: "a".repeat(201) },
+        { ...oklahoma, city: "a".repeat(101) },
+      ]) {
+        const response = await create(token, body);
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: "Invalid destination data." });
+      }
+      expect(await snapshot()).toEqual([]);
+    });
+
+    it("Destination storage failures return a safe error", async () => {
+      const destination = await db.destination.create(oklahoma);
+      const before = await snapshot();
+      const { token } = await signInAs("admin");
+      const failures = [
+        [jest.spyOn(db.destination, "findAll").mockRejectedValueOnce(new Error("connection lost")), () => list(token)],
+        [jest.spyOn(db.destination, "create").mockRejectedValueOnce(new Error("connection lost")), () => create(token, tulsa)],
+        [jest.spyOn(db.destination.prototype, "update").mockRejectedValueOnce(new Error("connection lost")), () => update(token, destination.id, tulsa)],
+        [jest.spyOn(db.destination.prototype, "destroy").mockRejectedValueOnce(new Error("connection lost")), () => remove(token, destination.id)],
+      ];
+      for (const [spy, run] of failures) {
+        const response = await run();
+        spy.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ message: "Destination request failed." });
+      }
+      expect(await snapshot()).toEqual(before);
+    });
   });
 
   describe("US-6.3 — Edit a destination", () => {
