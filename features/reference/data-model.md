@@ -102,6 +102,8 @@
 | purpose | String(500) | Required; trimmed; nonblank; case kept |
 | noteType | String(32), nullable | `general`, `special_instructions`, or `other`; paired with noteText |
 | noteText | String(1000), nullable | Trimmed; nonblank when present; paired with noteType |
+| vehicleId | Integer, nullable | Foreign key to `vehicles.id`, `ON DELETE RESTRICT`; set for `reserved`/`returned`; null otherwise |
+| statusReason | String(500), nullable | Optional when admin/area_admin cancels via status change; null for other statuses |
 | status | String(32) | Required; one of `requested`, `awaiting_vehicle`, `reserved`, `returned`, `cancelled`; created as `requested` |
 | createdAt, updatedAt | DateTime | Sequelize timestamps |
 
@@ -116,6 +118,7 @@
 | `area.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (not null), `onDelete: RESTRICT` — an area with requests cannot be deleted | Feature 7 |
 | `driver.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(driver, { as: "driver" })` | `foreignKey: driverId` (not null), `onDelete: RESTRICT` — a driver with requests cannot be deleted | Feature 7 |
 | `destination.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(destination, { as: "destination" })` | `foreignKey: destinationId` (nullable), `onDelete: RESTRICT` — a destination with requests cannot be deleted | Feature 7 |
+| `vehicle.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (nullable), `onDelete: RESTRICT` — a vehicle referenced by a reserved/returned request cannot be deleted | Feature 8 |
 
 Drivers have no foreign keys to users, areas, or vehicles. Destinations have no foreign keys to users, areas, vehicles, or drivers.
 
@@ -129,3 +132,4 @@ Drivers have no foreign keys to users, areas, or vehicles. Destinations have no 
 | drivers | Feature 5 |
 | destinations | Feature 6 |
 | reservation_requests | Feature 7 |
+| reservation_requests.vehicleId, reservation_requests.statusReason, vehicle association | Feature 8 |

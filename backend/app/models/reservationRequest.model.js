@@ -18,6 +18,8 @@ export default (sequelize, DataTypes) =>
       purpose: { type: DataTypes.STRING(500), allowNull: false },
       noteType: { type: DataTypes.STRING(32), allowNull: true },
       noteText: { type: DataTypes.STRING(1000), allowNull: true },
+      vehicleId: { type: DataTypes.INTEGER, allowNull: true },
+      statusReason: { type: DataTypes.STRING(500), allowNull: true },
       status: { type: DataTypes.STRING(32), allowNull: false },
     },
     {

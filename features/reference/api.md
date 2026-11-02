@@ -149,24 +149,34 @@ Destination fields: `{ "destinationName": "Oklahoma City Airport", "addressLine"
 | POST | `/vehicle-t6/reservation-requests` | requestor | ReservationRequest writable fields | `201`, new ReservationRequest with status `requested` |
 | PUT | `/vehicle-t6/reservation-requests/:id` | requestor (own `requested`) | ReservationRequest writable fields (complete replacement) | `200`, updated ReservationRequest |
 | PUT | `/vehicle-t6/reservation-requests/:id/cancel` | requestor (own `requested`) | empty body | `200`, ReservationRequest with status `cancelled` (via shared status-change function) |
+| GET | `/vehicle-t6/reservation-requests/:id/candidate-vehicles` | admin; area_admin (scoped) | none | `200`, array of Vehicle objects matching area, capacity, and availability, sorted by `make`, `model`, then `id` |
+| PUT | `/vehicle-t6/reservation-requests/:id/status` | admin; area_admin (scoped) | `{ "status", "vehicleId", "statusReason" }` | `200`, updated ReservationRequest |
 
-Writable fields: `{ "areaId", "driverId", "destinationId", "destinationCity", "estimatedMiles", "departureDate", "departureTime", "returnDate", "returnTime", "passengers", "purpose", "noteType", "noteText" }`. ReservationRequest object: writable fields plus generated `id`, `requestorUserId` (from session), and `status`. Client-supplied `requestorUserId` and `status` are ignored on write. `destinationId` (catalog mode) and `destinationCity`/`estimatedMiles` (free-text mode) are mutually exclusive; providing both or neither is rejected. `departureTime` and `returnTime` are optional as a pair (both null for whole-day trips, or both present as `HH:mm`). `noteType` and `noteText` are optional as a pair. `passengers` is 1–15. `purpose` is trimmed, nonblank, at most 500 characters. No GET-by-id endpoint exists.
+Writable fields: `{ "areaId", "driverId", "destinationId", "destinationCity", "estimatedMiles", "departureDate", "departureTime", "returnDate", "returnTime", "passengers", "purpose", "noteType", "noteText" }`. ReservationRequest object: writable fields plus generated `id`, `requestorUserId` (from session), `status`, `vehicleId`, and `statusReason`. Client-supplied `requestorUserId` and `status` are ignored on write. `destinationId` (catalog mode) and `destinationCity`/`estimatedMiles` (free-text mode) are mutually exclusive; providing both or neither is rejected. `departureTime` and `returnTime` are optional as a pair (both null for whole-day trips, or both present as `HH:mm`). `noteType` and `noteText` are optional as a pair. `passengers` is 1–15. `purpose` is trimmed, nonblank, at most 500 characters. No GET-by-id endpoint exists.
 
 List scope: requestor sees only own requests; area_admin sees only requests for own database `areaId` (empty if null); admin sees all. Maintenance gets 403 for every reservation-request endpoint.
 
 Cancel uses the shared status-change function (Feature 8) so Feature 9 can email on requestor cancels. Cancel does not delete the row.
+
+Status-change body: `{ "status": "<next>", "vehicleId": <id>|null, "statusReason": "<text>"|null }`. Allowed transitions: `requested` → `awaiting_vehicle` / `reserved` / `cancelled`; `awaiting_vehicle` → `reserved` / `cancelled`; `reserved` → `returned` / `cancelled`. When status is `reserved`, `vehicleId` must be a valid candidate vehicle. When status is `cancelled`, optional `statusReason` (trimmed, ≤ 500 chars). Moving to `returned` keeps the existing `vehicleId`. Candidate vehicles must match the request's area, have passengers ≥ request passengers, and have no time overlap with another `reserved`/`returned` assignment.
 
 | Condition | Status | Message |
 |-----------|--------|---------|
 | No valid session | 401 | `Unauthorized.` |
 | Disallowed role or maintenance access | 403 | `Forbidden.` |
 | Invalid field, schedule, destination mode, notes, passengers, or purpose | 400 | `Invalid reservation request data.` |
+| Illegal transition, capacity/area/overlap failure | 400 | `Invalid reservation request data.` |
 | Route id not a positive safe integer | 400 | `Reservation request id must be a positive integer.` |
+| Invalid vehicle route id | 400 | `Vehicle id must be a positive integer.` |
 | Missing area | 404 | `Area with id=<id> not found.` |
 | Missing driver | 404 | `Driver with id=<id> not found.` |
 | Missing destination | 404 | `Destination with id=<id> not found.` |
 | Missing, non-owned, or non-`requested` target on PUT/cancel | 404 | `Reservation request with id=<id> not found.` |
+| Missing or out-of-scope request on candidate-vehicles or status change | 404 | `Reservation request with id=<id> not found.` |
+| Missing vehicle when reserving | 404 | `Vehicle with id=<id> not found.` |
+| Candidate vehicles for non-reservable status | 400 | `Invalid reservation request data.` |
 | Delete of Area/Driver/Destination still referenced by a reservation request | 409 | `Area is in use.` / `Driver is in use.` / `Destination is in use.` |
+| Delete of Vehicle still referenced by reserved/returned request | 409 | `Vehicle is in use.` |
 | Database failure | 500 | `Reservation request failed.` |
 
 ## Provenance
@@ -180,3 +190,4 @@ Cancel uses the shared status-change function (Feature 8) so Feature 9 can email
 | Drivers options, list, create, update, delete | Feature 5 |
 | Destinations options, list, create, update, delete | Feature 6 |
 | Reservation requests list, create, update, cancel | Feature 7 |
+| Reservation request candidate-vehicles, status change | Feature 8 |

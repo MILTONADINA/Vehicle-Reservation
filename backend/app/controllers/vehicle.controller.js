@@ -186,6 +186,9 @@ controller.remove = async (req, res) => {
     await vehicle.destroy();
     return res.status(200).send({ message: "Vehicle deleted." });
   } catch (error) {
+    if (error instanceof db.Sequelize.ForeignKeyConstraintError) {
+      return res.status(409).send({ message: "Vehicle is in use." });
+    }
     return failed(res, "delete", error);
   }
 };

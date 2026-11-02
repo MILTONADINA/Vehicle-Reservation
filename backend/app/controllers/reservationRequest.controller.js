@@ -24,6 +24,8 @@ const requestPayload = (r) => ({
   purpose: r.purpose,
   noteType: r.noteType,
   noteText: r.noteText,
+  vehicleId: r.vehicleId ?? null,
+  statusReason: r.statusReason ?? null,
   status: r.status,
 });
 
@@ -272,6 +274,173 @@ controller.cancel = async (req, res) => {
     return res.status(200).send(requestPayload(updated));
   } catch (error) {
     return failed(res, "cancel", error);
+  }
+};
+
+const vehiclePayload = (v) => ({
+  id: v.id,
+  make: v.make,
+  model: v.model,
+  year: v.year,
+  vin: v.vin,
+  purchasedDate: v.purchasedDate,
+  color: v.color,
+  passengers: v.passengers,
+  plateNumber: v.plateNumber,
+  plateExpireMonth: v.plateExpireMonth,
+  designatedParking: v.designatedParking,
+  areaId: v.areaId,
+});
+
+const RESERVABLE_STATUSES = new Set(["requested", "awaiting_vehicle"]);
+const ADMIN_TRANSITIONS = {
+  requested: new Set(["awaiting_vehicle", "reserved", "cancelled"]),
+  awaiting_vehicle: new Set(["reserved", "cancelled"]),
+  reserved: new Set(["returned", "cancelled"]),
+};
+
+function scopeFilter(user) {
+  if (user.role === "admin") return {};
+  if (user.areaId === null) return null;
+  return { areaId: user.areaId };
+}
+
+async function findCandidateVehicles(reservationRequest) {
+  const { Op } = db.Sequelize;
+  const reqAreaId = reservationRequest.areaId;
+  const reqPassengers = reservationRequest.passengers;
+
+  const depDate = reservationRequest.departureDate;
+  const depTime = reservationRequest.departureTime || "00:00";
+  const retDate = reservationRequest.returnDate;
+  const retTime = reservationRequest.returnTime || "23:59";
+
+  // Find vehicles already booked on overlapping reserved/returned requests
+  const overlapping = await db.reservationRequest.findAll({
+    attributes: ["vehicleId", "departureDate", "departureTime", "returnDate", "returnTime"],
+    where: {
+      vehicleId: { [Op.ne]: null },
+      status: { [Op.in]: ["reserved", "returned"] },
+      id: { [Op.ne]: reservationRequest.id },
+    },
+  });
+
+  // Filter overlapping in JS using date/time comparison
+  const blockedVehicleIds = new Set();
+  for (const other of overlapping) {
+    const oDepDate = other.departureDate;
+    const oDepTime = other.departureTime || "00:00";
+    const oRetDate = other.returnDate;
+    const oRetTime = other.returnTime || "23:59";
+
+    const otherStart = `${oDepDate}T${oDepTime}`;
+    const otherEnd = `${oRetDate}T${oRetTime}`;
+    const reqStart = `${depDate}T${depTime}`;
+    const reqEnd = `${retDate}T${retTime}`;
+
+    if (reqStart < otherEnd && otherStart < reqEnd) {
+      blockedVehicleIds.add(other.vehicleId);
+    }
+  }
+
+  const vehicleWhere = {
+    areaId: reqAreaId,
+    passengers: { [Op.gte]: reqPassengers },
+  };
+  if (blockedVehicleIds.size > 0) {
+    vehicleWhere.id = { [Op.notIn]: [...blockedVehicleIds] };
+  }
+
+  const vehicles = await db.vehicle.findAll({
+    where: vehicleWhere,
+    order: [["make", "ASC"], ["model", "ASC"], ["id", "ASC"]],
+  });
+
+  return vehicles.map(vehiclePayload);
+}
+
+controller.candidateVehicles = async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return invalidRouteId(res);
+
+  try {
+    const scope = scopeFilter(req.user);
+    if (scope === null) return notFound(res, id);
+
+    const reservationRequest = await db.reservationRequest.findOne({ where: { id, ...scope } });
+    if (!reservationRequest) return notFound(res, id);
+
+    if (!RESERVABLE_STATUSES.has(reservationRequest.status)) {
+      return res.status(400).send({ message: "Invalid reservation request data." });
+    }
+
+    const candidates = await findCandidateVehicles(reservationRequest);
+    return res.status(200).send(candidates);
+  } catch (error) {
+    return failed(res, "candidate-vehicles", error);
+  }
+};
+
+controller.changeStatus = async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return invalidRouteId(res);
+
+  try {
+    const scope = scopeFilter(req.user);
+    if (scope === null) return notFound(res, id);
+
+    const reservationRequest = await db.reservationRequest.findOne({ where: { id, ...scope } });
+    if (!reservationRequest) return notFound(res, id);
+
+    const newStatus = req.body?.status;
+    const allowed = ADMIN_TRANSITIONS[reservationRequest.status];
+    if (!allowed || !allowed.has(newStatus)) {
+      return res.status(400).send({ message: "Invalid reservation request data." });
+    }
+
+    let vehicleId = null;
+    let statusReason = null;
+
+    if (newStatus === "reserved") {
+      const rawVehicleId = req.body?.vehicleId;
+      vehicleId = parsePositiveInt(rawVehicleId);
+      if (vehicleId === null) {
+        return res.status(400).send({ message: "Invalid reservation request data." });
+      }
+      const vehicle = await db.vehicle.findByPk(vehicleId);
+      if (!vehicle) {
+        return res.status(404).send({ message: `Vehicle with id=${vehicleId} not found.` });
+      }
+      // Validate candidate: area, capacity, overlap
+      const candidates = await findCandidateVehicles(reservationRequest);
+      const isCandidate = candidates.some((c) => c.id === vehicleId);
+      if (!isCandidate) {
+        return res.status(400).send({ message: "Invalid reservation request data." });
+      }
+    }
+
+    if (newStatus === "cancelled") {
+      const rawReason = req.body?.statusReason;
+      if (rawReason !== null && rawReason !== undefined) {
+        if (typeof rawReason === "string") {
+          const trimmedReason = rawReason.trim();
+          statusReason = trimmedReason.length > 0 && trimmedReason.length <= 500 ? trimmedReason : null;
+        }
+      }
+    }
+
+    const updated = await changeReservationRequestStatus(id, newStatus, scope, {
+      vehicleId,
+      statusReason,
+    });
+
+    if (!updated) {
+      return res.status(400).send({ message: "Invalid reservation request data." });
+    }
+
+    return res.status(200).send(requestPayload(updated));
+  } catch (error) {
+    return failed(res, "status change", error);
   }
 };
 

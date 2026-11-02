@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import ReservationRequestServices from "../services/reservationRequestServices.js";
 import AreaServices from "../services/areaServices.js";
 import DriverServices from "../services/driverServices.js";
@@ -18,6 +18,27 @@ onMounted(() => window.addEventListener("user-logged-in", refreshUser));
 onBeforeUnmount(() => window.removeEventListener("user-logged-in", refreshUser));
 
 const isRequestor = computed(() => user.value?.role === "requestor");
+const isAdmin = computed(() => user.value?.role === "admin");
+const isAreaAdmin = computed(() => user.value?.role === "area_admin");
+const isProcessor = computed(() => isAdmin.value || isAreaAdmin.value);
+
+const STATUS_TRANSITIONS = {
+  requested: ["awaiting_vehicle", "reserved", "cancelled"],
+  awaiting_vehicle: ["reserved", "cancelled"],
+  reserved: ["returned", "cancelled"],
+};
+
+const STATUS_LABELS = {
+  requested: "Requested",
+  awaiting_vehicle: "Awaiting Vehicle",
+  reserved: "Reserved",
+  returned: "Returned",
+  cancelled: "Cancelled",
+};
+
+function allowedTransitions(req) {
+  return STATUS_TRANSITIONS[req.status] || [];
+}
 
 const requests = ref([]);
 const areas = ref([]);
@@ -323,6 +344,111 @@ async function confirmCancel() {
     cancellation.canceling = false;
   }
 }
+
+const statusDialog = reactive({
+  open: false,
+  request: null,
+  saving: false,
+  error: "",
+  form: { status: null, vehicleId: null, statusReason: "" },
+});
+const candidateVehicles = ref([]);
+const loadingCandidates = ref(false);
+
+const statusOptions = computed(() => {
+  if (!statusDialog.request) return [];
+  return allowedTransitions(statusDialog.request).map((s) => ({
+    title: STATUS_LABELS[s] || s,
+    value: s,
+  }));
+});
+
+function openStatusDialog(req) {
+  statusDialog.request = req;
+  statusDialog.error = "";
+  statusDialog.saving = false;
+  candidateVehicles.value = [];
+  statusDialog.form.status = null;
+  statusDialog.form.vehicleId = null;
+  statusDialog.form.statusReason = "";
+  statusDialog.open = true;
+}
+
+function openMarkReturned(req) {
+  statusDialog.request = req;
+  statusDialog.error = "";
+  statusDialog.saving = false;
+  candidateVehicles.value = [];
+  statusDialog.form.vehicleId = null;
+  statusDialog.form.statusReason = "";
+  statusDialog.open = true;
+  statusDialog.form.status = "returned";
+}
+
+async function loadCandidates(requestId) {
+  loadingCandidates.value = true;
+  try {
+    const result = await ReservationRequestServices.getCandidateVehicles(requestId);
+    candidateVehicles.value = result.data;
+  } catch {
+    candidateVehicles.value = [];
+  } finally {
+    loadingCandidates.value = false;
+  }
+}
+
+watch(() => statusDialog.form.status, (newVal) => {
+  if (!statusDialog.open) return;
+  if (newVal === "reserved" && statusDialog.request) {
+    statusDialog.form.vehicleId = null;
+    loadCandidates(statusDialog.request.id);
+  } else {
+    candidateVehicles.value = [];
+    statusDialog.form.vehicleId = null;
+  }
+});
+
+function cancelStatusDialog() {
+  statusDialog.open = false;
+  statusDialog.error = "";
+  statusDialog.form.status = null;
+  statusDialog.form.vehicleId = null;
+  statusDialog.form.statusReason = "";
+  candidateVehicles.value = [];
+}
+
+async function saveStatus() {
+  if (statusDialog.saving) return;
+
+  const data = { status: statusDialog.form.status };
+
+  if (statusDialog.form.status === "reserved") {
+    data.vehicleId = statusDialog.form.vehicleId;
+  }
+
+  if (statusDialog.form.status === "cancelled") {
+    const reason = typeof statusDialog.form.statusReason === "string" ? statusDialog.form.statusReason.trim() : "";
+    if (reason) {
+      data.statusReason = reason;
+    }
+  }
+
+  statusDialog.saving = true;
+  statusDialog.error = "";
+  try {
+    await ReservationRequestServices.changeStatus(statusDialog.request.id, data);
+    statusDialog.open = false;
+    statusDialog.form.status = null;
+    statusDialog.form.vehicleId = null;
+    statusDialog.form.statusReason = "";
+    candidateVehicles.value = [];
+    await load();
+  } catch (reason) {
+    statusDialog.error = reason.response?.data?.message || "Reservation request could not be updated.";
+  } finally {
+    statusDialog.saving = false;
+  }
+}
 </script>
 
 <template>
@@ -349,6 +475,8 @@ async function confirmCancel() {
           <th>Purpose</th>
           <th>Notes</th>
           <th>Status</th>
+          <th>Vehicle</th>
+          <th>Status reason</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -364,9 +492,13 @@ async function confirmCancel() {
           <td>{{ req.purpose }}</td>
           <td>{{ displayNotes(req) }}</td>
           <td>{{ req.status }}</td>
+          <td>{{ req.vehicleId }}</td>
+          <td>{{ req.statusReason }}</td>
           <td>
             <v-btn v-if="isRequestor && req.requestorUserId === user?.userId && req.status === 'requested'" size="small" variant="text" color="primary" data-testid="edit-request" @click="openEdit(req)">Edit</v-btn>
             <v-btn v-if="isRequestor && req.requestorUserId === user?.userId && req.status === 'requested'" size="small" variant="text" color="error" data-testid="cancel-request" @click="openCancel(req)">Cancel</v-btn>
+            <v-btn v-if="isProcessor && allowedTransitions(req).length > 0" size="small" variant="text" color="primary" data-testid="status-change" @click="openStatusDialog(req)">Change status</v-btn>
+            <v-btn v-if="isProcessor && req.status === 'reserved'" size="small" variant="text" color="success" data-testid="mark-returned" @click="openMarkReturned(req)">Mark returned</v-btn>
           </td>
         </tr>
       </tbody>
@@ -440,6 +572,40 @@ async function confirmCancel() {
         <div class="d-flex justify-end">
           <v-btn color="secondary" variant="text" class="mr-2" :disabled="cancellation.canceling" data-testid="keep-request" @click="keepCancel">Keep</v-btn>
           <v-btn color="error" variant="elevated" class="oc-cta" :loading="cancellation.canceling" :disabled="cancellation.canceling" data-testid="confirm-cancel-request" @click="confirmCancel">Cancel request</v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="statusDialog.open" max-width="480" persistent>
+      <v-card rounded="lg" class="pa-6" data-testid="status-dialog">
+        <h2 class="text-h6 mb-4">Change status</h2>
+        <v-alert v-if="statusDialog.error" type="error" density="compact" class="mb-4" data-testid="status-form-error">{{ statusDialog.error }}</v-alert>
+        <v-select
+          v-model="statusDialog.form.status"
+          label="Status"
+          :items="statusOptions"
+          data-testid="status-select"
+        />
+        <v-select
+          v-if="statusDialog.form.status === 'reserved'"
+          v-model="statusDialog.form.vehicleId"
+          label="Vehicle"
+          :items="candidateVehicles"
+          :item-title="(v) => `${v.make} ${v.model}`"
+          item-value="id"
+          :loading="loadingCandidates"
+          data-testid="status-vehicle"
+        />
+        <v-textarea
+          v-if="statusDialog.form.status === 'cancelled'"
+          v-model="statusDialog.form.statusReason"
+          label="Status reason"
+          maxlength="500"
+          data-testid="status-reason"
+        />
+        <div class="d-flex justify-end mt-4">
+          <v-btn color="secondary" variant="text" class="mr-2" :disabled="statusDialog.saving" data-testid="cancel-status" @click="cancelStatusDialog">Cancel</v-btn>
+          <v-btn color="primary" variant="elevated" class="oc-cta" :loading="statusDialog.saving" :disabled="statusDialog.saving" data-testid="save-status" @click="saveStatus">Save</v-btn>
         </div>
       </v-card>
     </v-dialog>
