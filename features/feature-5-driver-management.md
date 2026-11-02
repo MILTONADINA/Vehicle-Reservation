@@ -290,16 +290,6 @@ Register the Driver model in `models/index.js`. This feature does not add a fore
 * **When** the driver is created
 * **Then** the server generates its own id and persists only the allowed driver fields
 
-#### Scenario: Oversized driver names are rejected
-* **Given** an admin posts a firstName or lastName longer than 100 characters
-* **When** POST /vehicle-t6/drivers is sent
-* **Then** the response is 400 with message Invalid driver data. and no driver is stored
-
-#### Scenario: Driver storage failures return a safe error
-* **Given** an authorized list, create, update, or delete encounters a database failure
-* **When** each operation is attempted
-* **Then** each response is 500 with message Driver request failed. and unsuccessful writes leave existing records unchanged
-
 #### Scenario: Add driver opens the specified form
 * **Given** an admin is on Drivers
 * **When** the admin selects Add driver
@@ -408,6 +398,18 @@ Register the Driver model in `models/index.js`. This feature does not add a fore
 * **Given** the delete confirmation is open
 * **When** the user selects Cancel
 * **Then** no delete request is sent and the driver remains on the list
+
+### US-5.2 — Add a driver
+
+#### Scenario: Oversized driver names are rejected
+* **Given** an admin posts a firstName or lastName longer than 100 characters
+* **When** POST /vehicle-t6/drivers is sent
+* **Then** the response is 400 with message Invalid driver data. and no driver is stored
+
+#### Scenario: Driver storage failures return a safe error
+* **Given** an authorized list, create, update, or delete encounters a database failure
+* **When** each operation is attempted
+* **Then** each response is 500 with message Driver request failed. and unsuccessful writes leave existing records unchanged
 
 ## Test Coverage Map
 
