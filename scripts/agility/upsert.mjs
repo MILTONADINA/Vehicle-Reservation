@@ -18,9 +18,9 @@ function buildStoryCreatePayload(scopeRef, epicOid, story) {
   };
 }
 
-function buildTestCreatePayload(scopeRef, storyOid, test) {
+function buildTestCreatePayload(_scopeRef, storyOid, test) {
+  // Test.Scope is read-only; scope comes from the parent Story.
   return {
-    Scope: scopeRef,
     AssetType: "Test",
     Name: test.name,
     Description: test.description,
