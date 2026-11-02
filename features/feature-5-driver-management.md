@@ -290,6 +290,16 @@ Register the Driver model in `models/index.js`. This feature does not add a fore
 * **When** the driver is created
 * **Then** the server generates its own id and persists only the allowed driver fields
 
+#### Scenario: Oversized driver names are rejected
+* **Given** an admin posts a firstName or lastName longer than 100 characters
+* **When** POST /vehicle-t6/drivers is sent
+* **Then** the response is 400 with message Invalid driver data. and no driver is stored
+
+#### Scenario: Driver storage failures return a safe error
+* **Given** an authorized list, create, update, or delete encounters a database failure
+* **When** each operation is attempted
+* **Then** each response is 500 with message Driver request failed. and unsuccessful writes leave existing records unchanged
+
 #### Scenario: Add driver opens the specified form
 * **Given** an admin is on Drivers
 * **When** the admin selects Add driver
@@ -425,6 +435,8 @@ Exact `it(...)` titles. Backend file: `backend/tests/drivers.test.js`. Frontend 
 | US-5.2 | Past license expire date can still be saved | `backend/tests/drivers.test.js` | `it("Past license expire date can still be saved")` |
 | US-5.2 | Requestor and maintenance cannot create a driver | `backend/tests/drivers.test.js` | `it("Requestor and maintenance cannot create a driver")` |
 | US-5.2 | Client cannot select a driver primary key | `backend/tests/drivers.test.js` | `it("Client cannot select a driver primary key")` |
+| US-5.2 | Oversized driver names are rejected | `backend/tests/drivers.test.js` | `it("Oversized driver names are rejected")` |
+| US-5.2 | Driver storage failures return a safe error | `backend/tests/drivers.test.js` | `it("Driver storage failures return a safe error")` |
 | US-5.2 | Add driver opens the specified form | `frontend/tests/Drivers.test.js` | `it("Add driver opens the specified form")` |
 | US-5.2 | Saving a driver updates the list | `frontend/tests/Drivers.test.js` | `it("Saving a driver updates the list")` |
 | US-5.2 | Cancel leaves driver records unchanged | `frontend/tests/Drivers.test.js` | `it("Cancel leaves driver records unchanged")` |
