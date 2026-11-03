@@ -2,7 +2,7 @@
 
 **Feature ID:** 6  
 **Branch pattern:** `feature/6-destination-management`  
-**Status:** Ready  
+**Status:** Shipped  
 
 
 **Created:** 2026-10-28  
