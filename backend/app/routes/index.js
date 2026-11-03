@@ -4,6 +4,7 @@ import areaRoutes from "./area.routes.js";
 import userRoutes from "./user.routes.js";
 import vehicleRoutes from "./vehicle.routes.js";
 import driverRoutes from "./driver.routes.js";
+import destinationRoutes from "./destination.routes.js";
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use("/areas", areaRoutes);
 router.use("/users", userRoutes);
 router.use("/vehicles", vehicleRoutes);
 router.use("/drivers", driverRoutes);
+router.use("/destinations", destinationRoutes);
 
 export default router;

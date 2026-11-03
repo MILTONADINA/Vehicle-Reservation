@@ -131,3 +131,23 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Driver could not be saved.`; Cancel discards values and errors | `Drivers.vue` `save()`, `cancelDialog()` | Feature 5 |
 | Delete asks `Delete this driver?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Driver could not be deleted.` | `Drivers.vue` `confirmDelete()` | Feature 5 |
 
+## Destinations
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Every signed-in role may list destinations and call `/destinations/options`; only admin and area_admin may create, update, or delete | `destination.routes.js` | Feature 6 |
+| Destinations are global with no area filtering; lists sort by `destinationName`, then `id` | `destination.controller.js` `list` | Feature 6 |
+| Names are unique ignoring case; address fields trim outer spaces and keep case; `state` is uppercased and must be on the standard USPS/DC list; `zipCode` is exactly 5 digits; `roundTripMiles` is `(0, 9999.9]` with at most one decimal digit; status is `active` or `inactive` | `validDestinationFields()`, `states.js` | Feature 6 |
+| Route ids must be positive safe integers; PUT replaces editable fields and keeps `id`; clients cannot choose an id | `parseDestinationId()`, `destinationPayload()` | Feature 6 |
+
+## Destinations screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| `/destinations` (heading **Destinations**) is linked from MenuBar for admin and area_admin only; signed-out visitors go to Login; requestor and maintenance are sent Home | `router.js` `meta.roles`, `MenuBar.vue` | Feature 6 |
+| Columns: Name, Address, City, State, Zip, Round-trip miles, Status, Actions; Add destination, Edit, and Delete for managers | `views/Destinations.vue` | Feature 6 |
+| Progress while loading; `No destinations found.` only after a successful empty response; failure shows the API message or `Destinations could not be loaded.` | `Destinations.vue` `load()` | Feature 6 |
+| Add/Edit dialogs use State from `/destinations/options`, Status `active`/`inactive`, Save and Cancel; client validation shows `Invalid destination data.` without a write | `Destinations.vue` | Feature 6 |
+| Save shows progress and blocks a second submit; success closes and reloads; failure keeps values and shows the API message or `Destination could not be saved.`; Cancel discards values and errors | `Destinations.vue` `save()`, `cancelDialog()` | Feature 6 |
+| Delete asks `Delete this destination?`; Cancel sends nothing; pending delete cannot be resubmitted; failure keeps dialog and row and shows the API message or `Destination could not be deleted.` | `Destinations.vue` `confirmDelete()` | Feature 6 |
+

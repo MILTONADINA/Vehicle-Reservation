@@ -120,6 +120,27 @@ Driver fields: `{ "firstName": "Jordan", "lastName": "Lee", "licenseState": "OK"
 | Missing driver | 404 | `Driver with id=<id> not found.` |
 | Database failure | 500 | `Driver request failed.` |
 
+## Destinations
+
+| Method | Endpoint | Allowed role | Request | Success |
+|--------|----------|--------------|---------|---------|
+| GET | `/vehicle-t6/destinations/options` | every signed-in role | none | `200`, `{ "states": ["AL", "AK", …] }` |
+| GET | `/vehicle-t6/destinations` | every signed-in role | none | `200`, array of Destination objects sorted by `destinationName`, then `id` |
+| POST | `/vehicle-t6/destinations` | admin, area_admin | Destination fields | `201`, new Destination object |
+| PUT | `/vehicle-t6/destinations/:id` | admin, area_admin | Destination fields (complete replacement) | `200`, updated Destination object |
+| DELETE | `/vehicle-t6/destinations/:id` | admin, area_admin | none | `200`, `{ "message": "Destination deleted." }` |
+
+Destination fields: `{ "destinationName": "Oklahoma City Airport", "addressLine": "7100 Terminal Drive", "city": "Oklahoma City", "state": "OK", "zipCode": "73159", "roundTripMiles": 120.5, "status": "active" }`. Destination object: those fields plus generated `id`. `state` is returned uppercase. Other body properties are ignored. `destinationName` is trimmed, nonblank, at most 100 characters, case kept, unique ignoring case. `addressLine` and `city` are trimmed, nonblank, at most 200 and 100 characters. `state` must be a two-letter USPS state or DC code from the standard list. `zipCode` is exactly 5 digits. `roundTripMiles` is greater than 0 and at most 9999.9 with at most one decimal digit. `status` is `active` or `inactive`. Destinations are global with no area. No GET-by-id endpoint exists.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Invalid field, zip, round-trip miles, status, or state | 400 | `Invalid destination data.` |
+| Route id not a positive safe integer | 400 | `Destination id must be a positive integer.` |
+| Disallowed role for create, update, or delete | 403 | `Forbidden.` |
+| Missing destination | 404 | `Destination with id=<id> not found.` |
+| Duplicate destination name | 409 | `Destination name is already in use.` |
+| Database failure | 500 | `Destination request failed.` |
+
 ## Provenance
 
 | Area | Introduced |
@@ -129,3 +150,4 @@ Driver fields: `{ "firstName": "Jordan", "lastName": "Lee", "licenseState": "OK"
 | Users list, create, update, delete | Feature 3 |
 | Vehicles options, list, create, update, delete | Feature 4 |
 | Drivers options, list, create, update, delete | Feature 5 |
+| Destinations options, list, create, update, delete | Feature 6 |

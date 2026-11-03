@@ -3,6 +3,8 @@
 **Feature ID:** 6  
 **Branch pattern:** `feature/6-destination-management`  
 **Status:** Ready  
+
+
 **Created:** 2026-10-28  
 **Input:** Maintain the list of trip destinations with a name, street address, city, state, zip code, round-trip miles, and active or inactive status so reservation requests can choose where a vehicle is going and estimate mileage.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md)
@@ -326,6 +328,16 @@ Register the Destination model in `models/index.js`. This feature does not add a
 * **When** the create request finishes
 * **Then** the dialog stays open with the entered values and shows the API message or Destination could not be saved.
 
+#### Scenario: Oversized destination fields are rejected
+* **Given** an admin posts a destinationName longer than 100 characters, an addressLine longer than 200 characters, or a city longer than 100 characters
+* **When** POST /vehicle-t6/destinations is sent
+* **Then** the response is 400 with message Invalid destination data. and no destination is stored
+
+#### Scenario: Destination storage failures return a safe error
+* **Given** an authorized list, create, update, or delete encounters a database failure
+* **When** each operation is attempted
+* **Then** each response is 500 with message Destination request failed. and unsuccessful writes leave existing records unchanged
+
 ### US-6.3 — Edit a destination
 
 #### Scenario: Admin updates a destination
@@ -447,6 +459,8 @@ Exact `it(...)` titles. Backend file: `backend/tests/destinations.test.js`. Fron
 | US-6.2 | Invalid destination round-trip miles are rejected | `backend/tests/destinations.test.js` | `it("Invalid destination round-trip miles are rejected")` |
 | US-6.2 | Requestor and maintenance cannot create a destination | `backend/tests/destinations.test.js` | `it("Requestor and maintenance cannot create a destination")` |
 | US-6.2 | Client cannot select a destination primary key | `backend/tests/destinations.test.js` | `it("Client cannot select a destination primary key")` |
+| US-6.2 | Oversized destination fields are rejected | `backend/tests/destinations.test.js` | `it("Oversized destination fields are rejected")` |
+| US-6.2 | Destination storage failures return a safe error | `backend/tests/destinations.test.js` | `it("Destination storage failures return a safe error")` |
 | US-6.2 | Add destination opens the specified form | `frontend/tests/Destinations.test.js` | `it("Add destination opens the specified form")` |
 | US-6.2 | Saving a destination updates the list | `frontend/tests/Destinations.test.js` | `it("Saving a destination updates the list")` |
 | US-6.2 | Cancel leaves destination records unchanged | `frontend/tests/Destinations.test.js` | `it("Cancel leaves destination records unchanged")` |
@@ -489,15 +503,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-020** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 6 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-020** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 6 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 
