@@ -139,8 +139,8 @@ describe("Feature 2 — Area Management", () => {
       expect(response.status).toBe(201);
       expect(response.body).toEqual({ id: expect.any(Number), ...athletics });
       expect(await snapshot()).toEqual([{ id: response.body.id, ...athletics }]);
-      // Saving reminder text is a plain write: no email module is part of this feature.
-      expect(Object.keys(db).some((key) => /mail|email/i.test(key))).toBe(false);
+      // Saving reminder text is a plain write: it prepares no email (Feature 9 only reads it).
+      expect(await db.reservationEmail.count()).toBe(0);
     });
 
     it("Area values are trimmed without changing their meaning", async () => {
@@ -272,7 +272,7 @@ describe("Feature 2 — Area Management", () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ id: athleticsId, ...replacement });
       expect(plain(await db.area.findByPk(athleticsId))).toEqual({ id: athleticsId, ...replacement });
-      expect(Object.keys(db).some((key) => /mail|email/i.test(key))).toBe(false);
+      expect(await db.reservationEmail.count()).toBe(0);
     });
 
     it("Area admin updates the assigned area", async () => {
