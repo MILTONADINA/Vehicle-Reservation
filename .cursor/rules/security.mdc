@@ -44,6 +44,9 @@ Roles are `admin`, `area_admin`, `requestor`, `maintenance`. Export from `author
 *   There is no password column, registration, or reset endpoint; identity comes from Google.
 *   The initial admin is provisioned with `npm run seed:admin` (`ADMIN_EMAIL`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME`), never by a first-login rule.
 
+## Email Secrets and Logs
+*   Reservation emails (Feature 9): SMTP credentials live only in `backend/.env`; email logs carry fixed codes, job ids, states, attempts, and counts, never recipients, message bodies, credentials, or provider errors.
+
 ## Optional Multi-Org Scoping (future)
 If org tenancy is added, centralize filters in `authorization/tenantScope.js`:
 *   `sessionTenantScopeWhere(req)` for standard users.

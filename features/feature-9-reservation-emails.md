@@ -2,7 +2,7 @@
 
 **Feature ID:** 9  
 **Branch pattern:** `feature/9-reservation-emails`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-29  
 **Input:** Email requestors when reservation status changes and send the area’s pickup/return instructions with trip details the day before a reserved trip.  
 **Depends on:** [Feature 2 — Area Management](feature-2-area-management.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 8 — Request Processing](feature-8-request-processing.md)
@@ -560,13 +560,13 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-022** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-007)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-022** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-007)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
 
 ## Out of Scope
 

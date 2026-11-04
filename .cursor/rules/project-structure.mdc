@@ -50,6 +50,7 @@ Backend (`backend/.env`):
 *   `SEQUELIZE_SYNC_ALTER` — set `true` to run `sync({ alter: true })` in dev only.
 *   `GOOGLE_CLIENT_ID` — OAuth client ID whose ID tokens `/login` accepts (Feature 1).
 *   `ADMIN_EMAIL`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` — inputs for `npm run seed:admin` (Feature 1).
+*   `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (`true`/`false`), `SMTP_FROM`, and the `SMTP_USER`/`SMTP_PASSWORD` pair — reservation-email sender (Feature 9). Missing or invalid values skip each email run with `EMAIL_CONFIGURATION_INVALID`; the server keeps running.
 
 Frontend (`frontend/.env`, copy from `frontend/.env.example`): `VITE_GOOGLE_CLIENT_ID` — the same client ID, used by the Google sign-in button. Use `import.meta.env.DEV` for dev/prod API base URL; `cross-env APP_ENV=development` in npm scripts.
 

@@ -40,6 +40,7 @@ cp frontend/.env.example frontend/.env
 # Create MySQL databases `vehicle-t6` and `vehicle-t6-test`; set DB_* and AUTH_SECRET
 # Set the team's Google client ID as GOOGLE_CLIENT_ID (backend) and VITE_GOOGLE_CLIENT_ID (frontend)
 # Set ADMIN_EMAIL, ADMIN_FIRST_NAME, and ADMIN_LAST_NAME (backend) for the first administrator
+# Set SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_FROM, SMTP_USER, and SMTP_PASSWORD (backend) for reservation emails
 
 npm test
 cd backend && npm run seed:admin   # once, creates the tables and the first administrator
@@ -47,7 +48,7 @@ cd backend && npm run dev
 cd frontend && npm run dev
 ```
 
-The `.env` files and the Google client ID are never committed.
+The `.env` files, the Google client ID, and the SMTP password are never committed.
 
 Works on **macOS, Windows, and Linux** — use `npm run …` for all tooling (PDF, Agility, bundles).
 
