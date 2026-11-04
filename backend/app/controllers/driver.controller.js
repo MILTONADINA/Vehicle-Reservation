@@ -117,6 +117,9 @@ controller.remove = async (req, res) => {
     await driver.destroy();
     return res.status(200).send({ message: "Driver deleted." });
   } catch (error) {
+    if (error instanceof db.Sequelize.ForeignKeyConstraintError) {
+      return res.status(409).send({ message: "Driver is in use." });
+    }
     return failed(res, "delete", error);
   }
 };

@@ -369,6 +369,26 @@ Register associations in `models/index.js`. This feature does not add vehicleId;
 * **When** the create request finishes
 * **Then** the dialog stays open with the entered values and shows the API message or Reservation request could not be saved.
 
+#### Scenario: Oversized reservation request fields are rejected
+* **Given** a requestor posts purpose longer than 500 characters, destinationCity longer than 100 characters, noteText longer than 1000 characters, or invalid estimatedMiles
+* **When** POST /vehicle-t6/reservation-requests is sent
+* **Then** the response is 400 with message Invalid reservation request data. and no request is stored
+
+#### Scenario: Reservation request storage failures return a safe error
+* **Given** an authorized list, create, update, cancel, or writable-field lookup encounters a database failure
+* **When** each operation is attempted
+* **Then** each response is 500 with message Reservation request failed. and unsuccessful writes leave existing records unchanged
+
+#### Scenario: Missing driver on reservation request is rejected
+* **Given** no driver has id 9999
+* **When** a requestor posts an otherwise valid request with driverId 9999
+* **Then** the response is 404 with message Driver with id=9999 not found. and no request is stored
+
+#### Scenario: Missing destination on reservation request is rejected
+* **Given** no destination has id 9999
+* **When** a requestor posts an otherwise valid catalog-destination request with destinationId 9999
+* **Then** the response is 404 with message Destination with id=9999 not found. and no request is stored
+
 ### US-7.3 — Edit a requested reservation request
 
 #### Scenario: Requestor updates own requested reservation request
@@ -483,6 +503,10 @@ Exact `it(...)` titles. Backend file: `backend/tests/reservationRequests.test.js
 | US-7.2 | Invalid passengers on reservation request are rejected | `backend/tests/reservationRequests.test.js` | `it("Invalid passengers on reservation request are rejected")` |
 | US-7.2 | Optional notes require both type and text | `backend/tests/reservationRequests.test.js` | `it("Optional notes require both type and text")` |
 | US-7.2 | Admin and area admin cannot create a reservation request | `backend/tests/reservationRequests.test.js` | `it("Admin and area admin cannot create a reservation request")` |
+| US-7.2 | Oversized reservation request fields are rejected | `backend/tests/reservationRequests.test.js` | `it("Oversized reservation request fields are rejected")` |
+| US-7.2 | Reservation request storage failures return a safe error | `backend/tests/reservationRequests.test.js` | `it("Reservation request storage failures return a safe error")` |
+| US-7.2 | Missing driver on reservation request is rejected | `backend/tests/reservationRequests.test.js` | `it("Missing driver on reservation request is rejected")` |
+| US-7.2 | Missing destination on reservation request is rejected | `backend/tests/reservationRequests.test.js` | `it("Missing destination on reservation request is rejected")` |
 | US-7.2 | Referenced destination cannot be deleted while in use | `backend/tests/reservationRequests.test.js` | `it("Referenced destination cannot be deleted while in use")` |
 | US-7.2 | Referenced driver cannot be deleted while in use | `backend/tests/reservationRequests.test.js` | `it("Referenced driver cannot be deleted while in use")` |
 | US-7.2 | Referenced area cannot be deleted while in use | `backend/tests/reservationRequests.test.js` | `it("Referenced area cannot be deleted while in use")` |
@@ -526,15 +550,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-024** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 7 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-024** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 7 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 

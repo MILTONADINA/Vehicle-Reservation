@@ -83,6 +83,28 @@
 | status | String(20) | Required; `active` or `inactive` |
 | createdAt, updatedAt | DateTime | Sequelize timestamps |
 
+### `reservation_requests`
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| requestorUserId | Integer | Required foreign key to `users.id`, `ON DELETE RESTRICT` |
+| areaId | Integer | Required foreign key to `areas.id`, `ON DELETE RESTRICT` |
+| driverId | Integer | Required foreign key to `drivers.id`, `ON DELETE RESTRICT` |
+| destinationId | Integer, nullable | Foreign key to `destinations.id`, `ON DELETE RESTRICT`; set in catalog destination mode |
+| destinationCity | String(100), nullable | Required in free-text mode; trimmed, nonblank |
+| estimatedMiles | Decimal(6,1), nullable | Required in free-text mode; > 0 and ≤ 9999.9, at most one decimal digit |
+| departureDate | Date only | Required; `YYYY-MM-DD` |
+| departureTime | String(5), nullable | `HH:mm` when timed; null for whole-day trips |
+| returnDate | Date only | Required; `YYYY-MM-DD` |
+| returnTime | String(5), nullable | `HH:mm` when timed; null for whole-day trips |
+| passengers | Integer | Required; 1 through 15 |
+| purpose | String(500) | Required; trimmed; nonblank; case kept |
+| noteType | String(32), nullable | `general`, `special_instructions`, or `other`; paired with noteText |
+| noteText | String(1000), nullable | Trimmed; nonblank when present; paired with noteType |
+| status | String(32) | Required; one of `requested`, `awaiting_vehicle`, `reserved`, `returned`, `cancelled`; created as `requested` |
+| createdAt, updatedAt | DateTime | Sequelize timestamps |
+
 ## Associations
 
 | Association | Options | Introduced |
@@ -90,8 +112,12 @@
 | `user.hasMany(session, { as: "sessions" })` / `session.belongsTo(user, { as: "user" })` | `foreignKey: userId` (not null), `onDelete: CASCADE` — sessions are deleted with their user | Feature 1 |
 | `area.hasMany(user, { as: "users" })` / `user.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (nullable), `onDelete: RESTRICT` — an area with assigned users cannot be deleted | Feature 2 |
 | `area.hasMany(vehicle, { as: "vehicles" })` / `vehicle.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (not null), `onDelete: RESTRICT` — an area with vehicles cannot be deleted | Feature 4 |
+| `user.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(user, { as: "requestor" })` | `foreignKey: requestorUserId` (not null), `onDelete: RESTRICT` — a user with requests cannot be deleted | Feature 7 |
+| `area.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(area, { as: "area" })` | `foreignKey: areaId` (not null), `onDelete: RESTRICT` — an area with requests cannot be deleted | Feature 7 |
+| `driver.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(driver, { as: "driver" })` | `foreignKey: driverId` (not null), `onDelete: RESTRICT` — a driver with requests cannot be deleted | Feature 7 |
+| `destination.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(destination, { as: "destination" })` | `foreignKey: destinationId` (nullable), `onDelete: RESTRICT` — a destination with requests cannot be deleted | Feature 7 |
 
-Drivers have no foreign keys to users, areas, vehicles, or reservations in this feature. Destinations have no foreign keys to users, areas, vehicles, drivers, or reservations in this feature.
+Drivers have no foreign keys to users, areas, or vehicles. Destinations have no foreign keys to users, areas, vehicles, or drivers.
 
 ## Provenance
 
@@ -102,3 +128,4 @@ Drivers have no foreign keys to users, areas, vehicles, or reservations in this 
 | vehicles | Feature 4 |
 | drivers | Feature 5 |
 | destinations | Feature 6 |
+| reservation_requests | Feature 7 |
