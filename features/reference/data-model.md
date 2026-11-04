@@ -107,6 +107,27 @@
 | status | String(32) | Required; one of `requested`, `awaiting_vehicle`, `reserved`, `returned`, `cancelled`; created as `requested` |
 | createdAt, updatedAt | DateTime | Sequelize timestamps |
 
+### `reservation_emails`
+
+Internal delivery records (Sequelize table `reservationEmails`); no API returns them.
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| reservationRequestId | Integer | Required foreign key to `reservation_requests.id`, `ON DELETE RESTRICT` |
+| kind | Enum | `status_change` or `pickup_reminder` |
+| notificationKey | String(32) | The new status for `status_change`; the departureDate `YYYY-MM-DD` for `pickup_reminder` |
+| recipient | String(254) | Required snapshot of the requestor's `users.email` |
+| subject | String(255) | Required message snapshot |
+| body | Text | Required plain-text message snapshot; reused on every retry |
+| deliveryState | Enum | `pending`, `sent`, `failed`, `skipped`; created `pending`; the last three are terminal |
+| attemptCount | Integer | Starts at 0; at most 3 transport attempts |
+| nextAttemptAt | DateTime, nullable | UTC; creation time, then five minutes after each failed attempt; null once terminal |
+| sentAt | DateTime, nullable | UTC provider-acceptance time once `sent`; null otherwise |
+| createdAt, updatedAt | DateTime | Sequelize timestamps |
+
+Unique index `reservation_emails_request_kind_key` on `(reservationRequestId, kind, notificationKey)`: one job per status event or per departure-date reminder.
+
 ## Associations
 
 | Association | Options | Introduced |
@@ -119,6 +140,7 @@
 | `driver.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(driver, { as: "driver" })` | `foreignKey: driverId` (not null), `onDelete: RESTRICT` — a driver with requests cannot be deleted | Feature 7 |
 | `destination.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(destination, { as: "destination" })` | `foreignKey: destinationId` (nullable), `onDelete: RESTRICT` — a destination with requests cannot be deleted | Feature 7 |
 | `vehicle.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (nullable), `onDelete: RESTRICT` — a vehicle referenced by a reserved/returned request cannot be deleted | Feature 8 |
+| `reservationRequest.hasMany(reservationEmail, { as: "emails" })` / `reservationEmail.belongsTo(reservationRequest, { as: "reservationRequest" })` | `foreignKey: reservationRequestId` (not null), `onDelete: RESTRICT` — no request-delete route exists, so this adds no 409 response | Feature 9 |
 
 Drivers have no foreign keys to users, areas, or vehicles. Destinations have no foreign keys to users, areas, vehicles, or drivers.
 
@@ -133,3 +155,4 @@ Drivers have no foreign keys to users, areas, or vehicles. Destinations have no 
 | destinations | Feature 6 |
 | reservation_requests | Feature 7 |
 | reservation_requests.vehicleId, reservation_requests.statusReason, vehicle association | Feature 8 |
+| reservation_emails | Feature 9 |

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import ReservationRequestServices from "../services/reservationRequestServices.js";
+import ReservationEmailServices from "../services/reservationEmailServices.js";
 import AreaServices from "../services/areaServices.js";
 import DriverServices from "../services/driverServices.js";
 import DestinationServices from "../services/destinationServices.js";
@@ -38,6 +39,34 @@ const STATUS_LABELS = {
 
 function allowedTransitions(req) {
   return STATUS_TRANSITIONS[req.status] || [];
+}
+
+// Feature 9: admin-only Send now runs the shared email cycle and shows only its returned counts.
+const SEND_NOW_FAILED = "Emails could not be processed.";
+const SEND_NOW_COUNTS = [
+  ["queued", "Queued"],
+  ["sent", "Sent"],
+  ["retryScheduled", "Retry scheduled"],
+  ["failed", "Failed"],
+  ["skipped", "Skipped"],
+];
+const sendNowState = reactive({ running: false, counts: null, error: "" });
+
+async function sendDueEmails() {
+  if (sendNowState.running) return;
+  sendNowState.running = true;
+  sendNowState.counts = null;
+  sendNowState.error = "";
+  try {
+    const { data } = await ReservationEmailServices.sendNow();
+    sendNowState.counts = Object.fromEntries(SEND_NOW_COUNTS.map(([key]) => [key, Number(data?.[key]) || 0]));
+  } catch (error) {
+    const status = error?.response?.status;
+    // 401 and 403 keep Feature 1's app-wide handling (sign-in redirect, Forbidden alert).
+    if (status !== 401 && status !== 403) sendNowState.error = error?.response?.data?.message || SEND_NOW_FAILED;
+  } finally {
+    sendNowState.running = false;
+  }
 }
 
 const requests = ref([]);
@@ -474,8 +503,26 @@ async function saveStatus() {
   <v-container class="py-10">
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 class="text-h4">Reservation requests</h1>
-      <v-btn v-if="isRequestor" color="primary" variant="elevated" class="oc-cta" data-testid="add-request" @click="openAdd">Add request</v-btn>
+      <div class="d-flex align-center ga-2">
+        <v-btn
+          v-if="isAdmin"
+          color="primary"
+          variant="outlined"
+          :loading="sendNowState.running"
+          :disabled="sendNowState.running"
+          data-testid="send-now"
+          @click="sendDueEmails"
+        >Send now</v-btn>
+        <v-btn v-if="isRequestor" color="primary" variant="elevated" class="oc-cta" data-testid="add-request" @click="openAdd">Add request</v-btn>
+      </div>
     </div>
+
+    <template v-if="isAdmin">
+      <v-alert v-if="sendNowState.counts" type="info" density="compact" class="mb-4" data-testid="send-now-result">
+        <span v-for="[key, label] in SEND_NOW_COUNTS" :key="key" class="mr-4" :data-testid="`send-now-${key}`">{{ label }}: {{ sendNowState.counts[key] }}</span>
+      </v-alert>
+      <v-alert v-if="sendNowState.error" type="error" density="compact" class="mb-4" data-testid="send-now-error">{{ sendNowState.error }}</v-alert>
+    </template>
 
     <v-progress-circular v-if="loading" indeterminate color="primary" data-testid="requests-loading" />
     <v-alert v-else-if="loadError" type="error" density="compact" data-testid="requests-error">{{ loadError }}</v-alert>

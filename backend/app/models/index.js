@@ -7,6 +7,7 @@ import vehicleModel from "./vehicle.model.js";
 import driverModel from "./driver.model.js";
 import destinationModel from "./destination.model.js";
 import reservationRequestModel from "./reservationRequest.model.js";
+import reservationEmailModel from "./reservationEmail.model.js";
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -19,6 +20,7 @@ db.vehicle = vehicleModel(sequelize, Sequelize);
 db.driver = driverModel(sequelize, Sequelize);
 db.destination = destinationModel(sequelize, Sequelize);
 db.reservationRequest = reservationRequestModel(sequelize, Sequelize);
+db.reservationEmail = reservationEmailModel(sequelize, Sequelize);
 
 // Sessions belong to one user and are deleted with that user.
 const sessionUserKey = { name: "userId", allowNull: false };
@@ -59,5 +61,10 @@ db.reservationRequest.belongsTo(db.destination, { foreignKey: requestDestination
 const requestVehicleKey = { name: "vehicleId", allowNull: true };
 db.vehicle.hasMany(db.reservationRequest, { foreignKey: requestVehicleKey, as: "reservationRequests", onDelete: "RESTRICT" });
 db.reservationRequest.belongsTo(db.vehicle, { foreignKey: requestVehicleKey, as: "vehicle", onDelete: "RESTRICT" });
+
+// Email notifications belong to one reservation request. A request with email jobs cannot be deleted.
+const emailRequestKey = { name: "reservationRequestId", allowNull: false };
+db.reservationRequest.hasMany(db.reservationEmail, { foreignKey: emailRequestKey, as: "emails", onDelete: "RESTRICT" });
+db.reservationEmail.belongsTo(db.reservationRequest, { foreignKey: emailRequestKey, as: "reservationRequest", onDelete: "RESTRICT" });
 
 export default db;

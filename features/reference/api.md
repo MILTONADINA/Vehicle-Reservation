@@ -156,7 +156,7 @@ Writable fields: `{ "areaId", "driverId", "destinationId", "destinationCity", "e
 
 List scope: requestor sees only own requests; area_admin sees only requests for own database `areaId` (empty if null); admin sees all. Maintenance gets 403 for every reservation-request endpoint.
 
-Cancel uses the shared status-change function (Feature 8) so Feature 9 can email on requestor cancels. Cancel does not delete the row.
+Cancel uses the shared status-change function (Feature 8), so a requestor cancel also saves the Feature 9 status email. Cancel does not delete the row.
 
 Status-change body: `{ "status": "<next>", "vehicleId": <id>|null, "statusReason": "<text>"|null }`. Allowed transitions: `requested` → `awaiting_vehicle` / `reserved` / `cancelled`; `awaiting_vehicle` → `reserved` / `cancelled`; `reserved` → `returned` / `cancelled`. When status is `reserved`, `vehicleId` must be a valid candidate vehicle. When status is `cancelled`, optional `statusReason` (trimmed, ≤ 500 chars). Moving to `returned` keeps the existing `vehicleId`. Candidate vehicles must match the request's area, have passengers ≥ request passengers, and have no time overlap with another `reserved`/`returned` assignment.
 
@@ -177,7 +177,23 @@ Status-change body: `{ "status": "<next>", "vehicleId": <id>|null, "statusReason
 | Candidate vehicles for non-reservable status | 400 | `Invalid reservation request data.` |
 | Delete of Area/Driver/Destination still referenced by a reservation request | 409 | `Area is in use.` / `Driver is in use.` / `Destination is in use.` |
 | Delete of Vehicle still referenced by reserved/returned request | 409 | `Vehicle is in use.` |
-| Database failure | 500 | `Reservation request failed.` |
+| Database failure, including a failed status-email insert (the status change rolls back) | 500 | `Reservation request failed.` |
+
+Every successful status change and requestor cancel saves one internal status email job in the same transaction (Feature 9). Responses are unchanged and never include email data; SMTP runs later, so an email failure never changes the status response.
+
+## Reservation Emails
+
+| Method | Endpoint | Allowed role | Request | Success |
+|--------|----------|--------------|---------|---------|
+| POST | `/vehicle-t6/reservation-emails/send-now` | admin | none; body and query are ignored | `200`, `{ "queued", "sent", "retryScheduled", "failed", "skipped" }` |
+
+Send now runs the same cycle as the every-minute schedule: prepare eligible day-before reminders, then dispatch due pending jobs and retries. Each count is a nonnegative integer for this invocation only, and all five keys are always present. The response never contains recipients, subjects, bodies, job records, or credentials.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| No valid session | 401 | `Unauthorized.` |
+| area_admin, requestor, or maintenance | 403 | `Forbidden.` |
+| Invalid SMTP configuration or an unexpected run failure | 500 | `Emails could not be processed.` |
 
 ## Provenance
 
@@ -191,3 +207,4 @@ Status-change body: `{ "status": "<next>", "vehicleId": <id>|null, "statusReason
 | Destinations options, list, create, update, delete | Feature 6 |
 | Reservation requests list, create, update, cancel | Feature 7 |
 | Reservation request candidate-vehicles, status change | Feature 8 |
+| Reservation emails send-now; status-email job on status change and cancel | Feature 9 |

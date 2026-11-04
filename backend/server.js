@@ -3,7 +3,9 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import db from "./app/models/index.js";
+import cron from "node-cron";
 import logger from "./app/config/logger.js";
+import { registerEmailSchedule } from "./app/reservationEmails/emailSchedule.js";
 
 const shouldAlterSchema =
   process.env.SEQUELIZE_SYNC_ALTER === "true" ||
@@ -19,6 +21,8 @@ if (process.env.NODE_ENV !== "test") {
       if (syncOptions.alter) {
         logger.info("Database sync completed with alter: true.");
       }
+      // One in-process email job per backend process (Feature 9); tests never start it.
+      registerEmailSchedule(cron);
     })
     .catch((err) => {
       logger.error(`Database sync failed: ${err.message}`);
