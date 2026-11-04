@@ -37,11 +37,7 @@ export function readSmtpConfig(env = process.env) {
   return { host, port: portNumber, from, secure: secure === "true", user: user || null, password: password || null };
 }
 
-// Every SMTP submission ends (accepted or failed) well before its five-minute claim expires, so a slow
-// provider can never let another dispatcher claim and resubmit a job that is still in flight.
-export const SEND_TIMEOUT_MS = 2 * 60 * 1000;
-
-/** Nodemailer SMTP options with per-stage timeouts shorter than the claim lifetime. */
+/** Nodemailer SMTP options; each stage times out well inside the five-minute claim. */
 export const smtpTransportOptions = (config) => ({
   host: config.host,
   port: config.port,

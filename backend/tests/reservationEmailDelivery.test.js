@@ -6,7 +6,7 @@ import { jest } from "@jest/globals";
 import db from "../app/models/index.js";
 import logger from "../app/config/logger.js";
 import { runEmailCycle, RETRY_DELAY_MS } from "../app/reservationEmails/emailCycle.js";
-import { emailRuntime, SEND_TIMEOUT_MS } from "../app/reservationEmails/emailConfig.js";
+import { emailRuntime } from "../app/reservationEmails/emailConfig.js";
 import { syncTestDatabase, signInAs } from "./helpers.js";
 import {
   installEmailRuntime,
@@ -158,9 +158,7 @@ describe("Feature 9 — Reservation Emails", () => {
       expect(clock.transport.attempts).toHaveLength(1);
       expect((await emailRows())[0]).toMatchObject({ deliveryState: "sent", attemptCount: 1 });
 
-      // A submission ends well before its claim expires, so a slow provider cannot let a second
-      // dispatcher claim and resubmit the job while the first submission is still in flight.
-      expect(SEND_TIMEOUT_MS).toBeLessThan(RETRY_DELAY_MS);
+      // SMTP stages time out well inside the five-minute claim.
       const smtp = realCreateTransport({ host: "smtp.test.invalid", port: 587, secure: false, user: null, password: null });
       const options = smtp.transporter.options;
       smtp.close();
@@ -168,15 +166,29 @@ describe("Feature 9 — Reservation Emails", () => {
         expect(options[key]).toBeGreaterThan(0);
         expect(options[key]).toBeLessThan(RETRY_DELAY_MS);
       }
-      const { job: hung } = await committedTransition({ departureDate: "2026-12-09", returnDate: "2026-12-09" });
-      clock.transport.sendMail = () => new Promise(() => {});
-      emailRuntime.sendTimeoutMs = 50;
+
+      // A slow submission keeps its claim while it is in flight: another dispatcher cannot claim and
+      // resubmit it even after the original five minutes, and a late acceptance is still recorded.
+      const { job: slow } = await committedTransition({ departureDate: "2026-12-09", returnDate: "2026-12-09" });
+      let accept;
+      clock.transport.sendMail = (message) => {
+        clock.transport.attempts.push(message);
+        return new Promise((resolve) => { accept = () => resolve({ accepted: [message.to] }); });
+      };
+      emailRuntime.leaseRenewMs = 20;
       try {
-        expect(await scheduled.tick()).toMatchObject({ sent: 0, retryScheduled: 1 });
+        const first = scheduled.tick();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        clock.advanceMinutes(6);
+        await new Promise((resolve) => setTimeout(resolve, 80)); // renewals at the new clock time
+        expect(await runEmailCycle()).toMatchObject({ sent: 0, retryScheduled: 0, failed: 0 });
+        expect(clock.transport.attempts.filter((m) => m.text === slow.body)).toHaveLength(1);
+        accept();
+        expect(await first).toMatchObject({ sent: 1 });
       } finally {
-        delete emailRuntime.sendTimeoutMs;
+        delete emailRuntime.leaseRenewMs;
       }
-      expect((await emailRows({ id: hung.id }))[0]).toMatchObject({ deliveryState: "pending", attemptCount: 1 });
+      expect((await emailRows({ id: slow.id }))[0]).toMatchObject({ deliveryState: "sent", attemptCount: 1 });
     });
 
     it("Missing email configuration preserves pending jobs", async () => {

@@ -1,11 +1,12 @@
 import db from "../models/index.js";
 import logger from "../config/logger.js";
-import { emailRuntime, readSmtpConfig, SEND_TIMEOUT_MS } from "./emailConfig.js";
+import { emailRuntime, readSmtpConfig } from "./emailConfig.js";
 import { campusParts, addCalendarDays, reminderDepartureDate, REMINDER_START_HOUR } from "./campusClock.js";
 import { pickupReminderMessage } from "./messages.js";
 
 export const MAX_ATTEMPTS = 3;
 export const RETRY_DELAY_MS = 5 * 60 * 1000;
+export const LEASE_RENEW_MS = 60 * 1000;
 
 const { Op, UniqueConstraintError } = db.Sequelize;
 
@@ -91,14 +92,24 @@ function claimJob(due) {
   });
 }
 
-/** A submission that has not settled in time counts as a failed attempt. */
-function withTimeout(submission) {
-  let timer;
-  const limit = emailRuntime.sendTimeoutMs ?? SEND_TIMEOUT_MS;
-  const expired = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error("EMAIL_SEND_TIMEOUT")), limit);
-  });
-  return Promise.race([submission, expired]).finally(() => clearTimeout(timer));
+const retryAt = () => new Date(emailRuntime.now().getTime() + RETRY_DELAY_MS);
+
+/**
+ * Submits a claimed job while keeping its claim: until the submission settles, nextAttemptAt is pushed
+ * five minutes ahead every minute, so no other dispatcher can claim and resubmit a job still in flight.
+ * If this process stops, renewals stop and the claim expires normally.
+ */
+async function submitHoldingClaim(job, submit) {
+  const renew = setInterval(() => {
+    db.reservationEmail
+      .update({ nextAttemptAt: retryAt() }, { where: { id: job.id, deliveryState: "pending", attemptCount: job.attemptCount } })
+      .catch(() => logger.warn(`EMAIL_CLAIM_RENEW_FAILED id=${job.id}`));
+  }, emailRuntime.leaseRenewMs ?? LEASE_RENEW_MS);
+  try {
+    return await submit();
+  } finally {
+    clearInterval(renew);
+  }
 }
 
 /** Submits every due pending job once; one transport failure never stops the rest. */
@@ -126,7 +137,7 @@ async function dispatchDue(instant, transport, from, counts) {
 
     let accepted = false;
     try {
-      await withTimeout(transport.sendMail({ from, to: job.recipient, subject: job.subject, text: job.body }));
+      await submitHoldingClaim(job, () => transport.sendMail({ from, to: job.recipient, subject: job.subject, text: job.body }));
       accepted = true;
     } catch {
       // Provider errors can echo addresses or credentials, so only the fixed code below is logged.
@@ -147,6 +158,8 @@ async function dispatchDue(instant, transport, from, counts) {
       counts.failed += 1;
       logger.warn(`EMAIL_DELIVERY_FAILED id=${job.id} state=failed attempts=${job.attemptCount}`);
     } else {
+      // The retry waits five minutes from when this attempt actually ended.
+      await db.reservationEmail.update({ nextAttemptAt: retryAt() }, { where: { id: job.id, deliveryState: "pending" } });
       counts.retryScheduled += 1;
       logger.warn(`EMAIL_RETRY_SCHEDULED id=${job.id} state=pending attempts=${job.attemptCount}`);
     }
