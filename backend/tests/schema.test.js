@@ -19,5 +19,6 @@ describe("Schema sync", () => {
     expect(await uniqueIndexCount("areas", "areaName")).toBe(1);
     expect(await uniqueIndexCount("vehicles", "vin")).toBe(1);
     expect(await uniqueIndexCount("destinations", "destinationName")).toBe(1);
+    expect(await uniqueIndexCount("reservationEmails", "notificationKey")).toBe(1);
   });
 });
