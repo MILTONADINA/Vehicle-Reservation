@@ -2,7 +2,7 @@
 
 **Feature ID:** 8  
 **Branch pattern:** `feature/8-request-processing`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-28  
 **Input:** Let admins and area admins process reservation requests through one shared status-change operation—moving trips among Awaiting Vehicle, Reserved, Returned, and Cancelled, assigning an in-area vehicle when reserving—so Feature 9 can hook emails to that same status change.  
 **Depends on:** [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests](feature-7-reservation-requests.md)
