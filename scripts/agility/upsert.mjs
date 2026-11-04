@@ -50,6 +50,7 @@ function emptyUpsertPlan() {
  * @param {(path: string) => Promise<{ ok: boolean, status: number, text: string }>} restGet
  */
 export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet) {
+  const specTestNames = new Set(feature.stories.flatMap((story) => story.tests.map((test) => test.name)));
   const plan = emptyUpsertPlan();
   const existingStories = await listAssetsWhere(restGet, "Story", `Super='${epicOid}'`, ["Description"]);
 
@@ -73,21 +74,31 @@ export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet
       const existingTests = await listChildAssets(restGet, "Test", existingStory.oid, ["Description", "ExpectedResults"]);
 
       for (const test of story.tests) {
-        const existingTest = findAssetByRefOrName(existingTests, {
-          ref: test.ref,
-          name: test.name,
-        });
+        // Test references are scenario positions, so they shift when a scenario is inserted or moved.
+        // Match by the exact scenario name; fall back to the reference only for a renamed scenario,
+        // i.e. a test whose current name no longer appears anywhere in the spec.
+        const existingTest =
+          existingTests.find((asset) => asset.name === test.name) ??
+          existingTests.find((asset) => asset.reference === test.ref && !specTestNames.has(asset.name)) ??
+          null;
 
         if (existingTest) {
-          if (existingTest.description === test.description && existingTest.expectedResults === test.expectedResults) {
+          if (
+            existingTest.name === test.name &&
+            existingTest.reference === test.ref &&
+            existingTest.description === test.description &&
+            existingTest.expectedResults === test.expectedResults
+          ) {
             plan.testsUnchanged.push({ oid: existingTest.oid, name: test.name, ref: test.ref });
           } else {
             plan.testsToUpdate.push({ oid: existingTest.oid, name: test.name, ref: test.ref });
             plan.payloads.push({
               from: existingTest.oid,
               update: {
+                Name: test.name,
                 Description: test.description,
                 ExpectedResults: test.expectedResults,
+                Reference: test.ref,
               },
             });
           }
