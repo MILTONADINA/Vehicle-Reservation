@@ -37,17 +37,22 @@ export function readSmtpConfig(env = process.env) {
   return { host, port: portNumber, from, secure: secure === "true", user: user || null, password: password || null };
 }
 
+/** Nodemailer SMTP options; each stage times out well inside the five-minute claim. */
+export const smtpTransportOptions = (config) => ({
+  host: config.host,
+  port: config.port,
+  secure: config.secure,
+  connectionTimeout: 30 * 1000,
+  greetingTimeout: 30 * 1000,
+  socketTimeout: 60 * 1000,
+  ...(config.user ? { auth: { user: config.user, pass: config.password } } : {}),
+});
+
 /**
  * Process-wide email dependencies. Tests replace `now` and `createTransport` with a fixed clock and a
  * fake transport; production uses the real clock and Nodemailer SMTP.
  */
 export const emailRuntime = {
   now: () => new Date(),
-  createTransport: (config) =>
-    nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      ...(config.user ? { auth: { user: config.user, pass: config.password } } : {}),
-    }),
+  createTransport: (config) => nodemailer.createTransport(smtpTransportOptions(config)),
 };

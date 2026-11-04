@@ -6,6 +6,7 @@ import { pickupReminderMessage } from "./messages.js";
 
 export const MAX_ATTEMPTS = 3;
 export const RETRY_DELAY_MS = 5 * 60 * 1000;
+export const LEASE_RENEW_MS = 60 * 1000;
 
 const { Op, UniqueConstraintError } = db.Sequelize;
 
@@ -70,19 +71,45 @@ function claimJob(due) {
         ? await db.reservationRequest.findByPk(due.reservationRequestId, { lock: transaction.LOCK.UPDATE, transaction })
         : null;
     const job = await db.reservationEmail.findByPk(due.id, { lock: transaction.LOCK.UPDATE, transaction });
-    if (!job || job.deliveryState !== "pending" || job.attemptCount >= MAX_ATTEMPTS || job.nextAttemptAt > instant) {
+    if (!job || job.deliveryState !== "pending" || job.nextAttemptAt > instant) {
       return null;
     }
     if (job.kind === "pickup_reminder" && !reminderStillEligible(request, job.notificationKey, instant)) {
       await job.update({ deliveryState: "skipped", nextAttemptAt: null }, { transaction });
-      return { skipped: true, job };
+      return { outcome: "skipped", job };
+    }
+    if (job.attemptCount >= MAX_ATTEMPTS) {
+      // The final attempt was claimed but its outcome was never recorded (process stopped or the
+      // update failed). Its claim has expired: close it as failed instead of leaving it pending.
+      await job.update({ deliveryState: "failed", nextAttemptAt: null }, { transaction });
+      return { outcome: "failed", job };
     }
     await job.update(
       { attemptCount: job.attemptCount + 1, nextAttemptAt: new Date(instant.getTime() + RETRY_DELAY_MS) },
       { transaction }
     );
-    return { skipped: false, job };
+    return { outcome: "claimed", job };
   });
+}
+
+const retryAt = () => new Date(emailRuntime.now().getTime() + RETRY_DELAY_MS);
+
+/**
+ * Submits a claimed job while keeping its claim: until the submission settles, nextAttemptAt is pushed
+ * five minutes ahead every minute, so no other dispatcher can claim and resubmit a job still in flight.
+ * If this process stops, renewals stop and the claim expires normally.
+ */
+async function submitHoldingClaim(job, submit) {
+  const renew = setInterval(() => {
+    db.reservationEmail
+      .update({ nextAttemptAt: retryAt() }, { where: { id: job.id, deliveryState: "pending", attemptCount: job.attemptCount } })
+      .catch(() => logger.warn(`EMAIL_CLAIM_RENEW_FAILED id=${job.id}`));
+  }, emailRuntime.leaseRenewMs ?? LEASE_RENEW_MS);
+  try {
+    return await submit();
+  } finally {
+    clearInterval(renew);
+  }
 }
 
 /** Submits every due pending job once; one transport failure never stops the rest. */
@@ -97,15 +124,20 @@ async function dispatchDue(instant, transport, from, counts) {
     const claim = await claimJob(candidate);
     if (!claim) continue;
     const { job } = claim;
-    if (claim.skipped) {
+    if (claim.outcome === "skipped") {
       counts.skipped += 1;
       logger.info(`EMAIL_SKIPPED id=${job.id} state=skipped`);
+      continue;
+    }
+    if (claim.outcome === "failed") {
+      counts.failed += 1;
+      logger.warn(`EMAIL_DELIVERY_FAILED id=${job.id} state=failed attempts=${job.attemptCount}`);
       continue;
     }
 
     let accepted = false;
     try {
-      await transport.sendMail({ from, to: job.recipient, subject: job.subject, text: job.body });
+      await submitHoldingClaim(job, () => transport.sendMail({ from, to: job.recipient, subject: job.subject, text: job.body }));
       accepted = true;
     } catch {
       // Provider errors can echo addresses or credentials, so only the fixed code below is logged.
@@ -126,6 +158,8 @@ async function dispatchDue(instant, transport, from, counts) {
       counts.failed += 1;
       logger.warn(`EMAIL_DELIVERY_FAILED id=${job.id} state=failed attempts=${job.attemptCount}`);
     } else {
+      // The retry waits five minutes from when this attempt actually ended.
+      await db.reservationEmail.update({ nextAttemptAt: retryAt() }, { where: { id: job.id, deliveryState: "pending" } });
       counts.retryScheduled += 1;
       logger.warn(`EMAIL_RETRY_SCHEDULED id=${job.id} state=pending attempts=${job.attemptCount}`);
     }
