@@ -59,7 +59,7 @@ Every story is P1: each one must ship for the assignment’s Request Processing 
 * **FR-010:** Candidate vehicles MUST satisfy all of: same areaId as the request; passengers greater than or equal to the request’s passengers; and no time overlap with another `reserved` or `returned` request that already has that vehicleId. Overlap uses each request’s departureDate/departureTime and returnDate/returnTime, treating null times as whole-day bounds (00:00 start, 23:59 end). Results MUST sort by make, model, then id. Empty lists MUST be 200 with [].
 * **FR-011:** Area_admin candidate and status-change actions MUST stay inside that user’s areaId. Admin may use any vehicle that otherwise meets FR-010. Scope MUST come from the database, not client claims.
 * **FR-012:** Moving to `reserved` MUST set status `reserved` and vehicleId. Moving to `awaiting_vehicle` MUST set that status and keep vehicleId null. Moving to `returned` MUST require current status `reserved`, keep vehicleId, and set status `returned`. Moving to `cancelled` through this feature MUST set status `cancelled`, clear vehicleId, and store statusReason when provided.
-* **FR-013:** A missing vehicle on reserve MUST return 404 `Vehicle with id=<id> not found.` A vehicle that fails area, capacity, or overlap rules MUST return 400 `Invalid reservation request data.` Concurrent overlap between candidate load and status change MUST also return 400.
+* **FR-013:** A missing vehicle on reserve MUST return 404 `Vehicle with id=<id> not found.` A vehicle that fails area, capacity, or overlap rules MUST return 400 `Invalid reservation request data.` Concurrent overlap between candidate load and status change MUST also return 400. Moving to `reserved` MUST run the candidate check and status update in one database transaction that locks the reservation-request row and the chosen vehicle row so two simultaneous reserves cannot double-book the same vehicle.
 * **FR-014:** Route ids MUST be positive safe integers; invalid ids MUST return 400 `Reservation request id must be a positive integer.` or `Vehicle id must be a positive integer.` as applicable. Missing or out-of-scope requests on status change MUST return 404 `Reservation request with id=<id> not found.`
 * **FR-015:** Foreign key from reservation_requests.vehicleId to vehicles.id MUST use `ON DELETE RESTRICT`. Deleting a vehicle still referenced by a `reserved` or `returned` request MUST return 409 `Vehicle is in use.` This feature owns that 409 test because it adds the vehicle reference.
 * **FR-016:** Service queue behavior stays in Feature 11. This feature MUST NOT implement a service queue.
@@ -80,6 +80,7 @@ Every story is P1: each one must ship for the assignment’s Request Processing 
 * An area admin with no area assignment sees an empty list and cannot change status.
 * A vehicle that seats enough people but belongs to another area cannot be reserved.
 * A vehicle already on an overlapping reserved/returned trip cannot be reserved again.
+* Two admins reserving the same vehicle at the same time: the second waits on the vehicle row lock, re-checks candidates, and gets 400 if the vehicle is no longer free.
 * Candidate list can be empty; reserve must still validate server-side.
 * Illegal status transitions leave the row unchanged.
 
@@ -317,6 +318,11 @@ Register ReservationRequest belongsTo Vehicle. Do not remove Feature 7 associati
 * **When** an admin sends status reserved with vehicleId 9999
 * **Then** the response is 404 with message Vehicle with id=9999 not found. and the request is unchanged
 
+#### Scenario: Reserve locks the request and vehicle rows in one transaction
+* **Given** request id 1 is reservable and vehicle 12 is a valid candidate
+* **When** an admin sends status reserved with vehicleId 12
+* **Then** the candidate check and status update run inside one transaction that locks the request row and vehicle 12 before writing reserved
+
 #### Scenario: Area admin cannot change status for another area request
 * **Given** an area_admin has areaId 2 and request id 3 belongs to area 1
 * **When** that user sends any status change for request 3
@@ -404,6 +410,7 @@ Exact `it(...)` titles. Backend file: `backend/tests/requestProcessing.test.js`.
 | US-8.3 | Reserve rejects an undersized vehicle | `backend/tests/requestProcessing.test.js` | `it("Reserve rejects an undersized vehicle")` |
 | US-8.3 | Reserve rejects an overlapping vehicle assignment | `backend/tests/requestProcessing.test.js` | `it("Reserve rejects an overlapping vehicle assignment")` |
 | US-8.3 | Reserve rejects a missing vehicle | `backend/tests/requestProcessing.test.js` | `it("Reserve rejects a missing vehicle")` |
+| US-8.3 | Reserve locks the request and vehicle rows in one transaction | `backend/tests/requestProcessing.test.js` | `it("Reserve locks the request and vehicle rows in one transaction")` |
 | US-8.3 | Area admin cannot change status for another area request | `backend/tests/requestProcessing.test.js` | `it("Area admin cannot change status for another area request")` |
 | US-8.3 | Referenced vehicle cannot be deleted while in use | `backend/tests/requestProcessing.test.js` | `it("Referenced vehicle cannot be deleted while in use")` |
 | US-8.3 | Invalid reservation request route id is rejected on status change | `backend/tests/requestProcessing.test.js` | `it("Invalid reservation request route id is rejected on status change")` |

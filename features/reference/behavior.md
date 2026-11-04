@@ -171,6 +171,7 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Candidate vehicles GET `/reservation-requests/:id/candidate-vehicles` returns qualifying vehicles (same area, passengers ≥ request, no time overlap with reserved/returned assignments); sorted by make, model, id; only for requested/awaiting_vehicle status | `reservationRequest.controller.js` `candidateVehicles` | Feature 8 |
 | Area_admin scoping: candidate-vehicles and status-change are limited to requests and vehicles in the admin's own areaId; out-of-scope requests return 404 | `controller.candidateVehicles`, `controller.changeStatus` | Feature 8 |
 | Moving to `reserved` sets vehicleId (must be valid candidate); moving to `returned` keeps existing vehicleId; moving to `cancelled` clears vehicleId and may store statusReason (trimmed, ≤ 500 chars); moving to `awaiting_vehicle` keeps vehicleId null | `changeReservationRequestStatus()` | Feature 8 |
+| Reserve candidate check and status write run in one transaction that locks the reservation-request row and the chosen vehicle row (`LOCK.UPDATE`) so concurrent reserves cannot double-book; a vehicle that ceases to be a candidate returns 400 | `controller.changeStatus` reserved branch | Feature 8 |
 | Foreign key from `reservation_requests.vehicleId` to `vehicles.id` uses `ON DELETE RESTRICT`; deleting a vehicle referenced by a reserved/returned request returns 409 `Vehicle is in use.` | `models/index.js` associations | Feature 8 |
 
 ## Reservation requests screen
