@@ -5,4 +5,6 @@ export default {
   create(data) { return apiClient.post("reservation-requests", data); },
   update(id, data) { return apiClient.put(`reservation-requests/${id}`, data); },
   cancel(id) { return apiClient.put(`reservation-requests/${id}/cancel`); },
+  getCandidateVehicles(id) { return apiClient.get(`reservation-requests/${id}/candidate-vehicles`); },
+  changeStatus(id, data) { return apiClient.put(`reservation-requests/${id}/status`, data); },
 };

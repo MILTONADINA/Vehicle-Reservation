@@ -55,4 +55,9 @@ const requestDestinationKey = { name: "destinationId", allowNull: true };
 db.destination.hasMany(db.reservationRequest, { foreignKey: requestDestinationKey, as: "reservationRequests", onDelete: "RESTRICT" });
 db.reservationRequest.belongsTo(db.destination, { foreignKey: requestDestinationKey, as: "destination", onDelete: "RESTRICT" });
 
+// Reservation requests may reference one vehicle. A vehicle with requests cannot be deleted.
+const requestVehicleKey = { name: "vehicleId", allowNull: true };
+db.vehicle.hasMany(db.reservationRequest, { foreignKey: requestVehicleKey, as: "reservationRequests", onDelete: "RESTRICT" });
+db.reservationRequest.belongsTo(db.vehicle, { foreignKey: requestVehicleKey, as: "vehicle", onDelete: "RESTRICT" });
+
 export default db;

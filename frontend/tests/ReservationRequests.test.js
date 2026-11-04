@@ -18,7 +18,7 @@ vi.mock("../src/services/authServices.js", () => ({
   default: { loginWithGoogle: vi.fn(), me: vi.fn(), logoutUser: vi.fn() },
 }));
 vi.mock("../src/services/reservationRequestServices.js", () => ({
-  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), cancel: vi.fn() },
+  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), cancel: vi.fn(), getCandidateVehicles: vi.fn(), changeStatus: vi.fn() },
 }));
 vi.mock("../src/services/areaServices.js", () => ({
   default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
