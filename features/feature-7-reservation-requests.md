@@ -2,7 +2,7 @@
 
 **Feature ID:** 7  
 **Branch pattern:** `feature/7-reservation-requests`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-28  
 **Input:** Let requestors submit vehicle reservation requests that name an area, approved driver, destination or free-text city with typed mileage, trip dates with optional times, passengers, purpose, and optional notes, then view, edit, or cancel their own requested trips before Feature 8 processes them.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 2 — Area Management](feature-2-area-management.md), [Feature 5 — Driver Management](feature-5-driver-management.md), [Feature 6 — Destination Management](feature-6-destination-management.md)
