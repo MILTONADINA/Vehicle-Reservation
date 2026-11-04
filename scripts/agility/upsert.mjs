@@ -49,6 +49,28 @@ function emptyUpsertPlan() {
  * @param {string} epicOid Epic OID
  * @param {(path: string) => Promise<{ ok: boolean, status: number, text: string }>} restGet
  */
+/**
+ * Finds the existing Agility test for a spec scenario. Test references are scenario positions, so they
+ * shift when a scenario is inserted or moved; the exact scenario name is the identity. Each existing test
+ * is matched at most once. When several unmatched tests share the name, prefer the same reference and
+ * text, then the same text (references shift), then the same reference. The reference alone is used only for a renamed scenario, i.e. a test
+ * whose current name no longer appears anywhere in the spec.
+ */
+const sameText = (asset, test) => asset.description === test.description && asset.expectedResults === test.expectedResults;
+
+export function matchExistingTest(existingTests, test, specTestNames, matchedOids = new Set()) {
+  const open = existingTests.filter((asset) => !matchedOids.has(asset.oid));
+  const sameName = open.filter((asset) => asset.name === test.name);
+  return (
+    sameName.find((asset) => asset.reference === test.ref && sameText(asset, test)) ??
+    sameName.find((asset) => sameText(asset, test)) ??
+    sameName.find((asset) => asset.reference === test.ref) ??
+    sameName[0] ??
+    open.find((asset) => asset.reference === test.ref && !specTestNames.has(asset.name)) ??
+    null
+  );
+}
+
 export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet) {
   const specTestNames = new Set(feature.stories.flatMap((story) => story.tests.map((test) => test.name)));
   const plan = emptyUpsertPlan();
@@ -73,14 +95,10 @@ export async function buildFeatureUpsertPlan(feature, scopeRef, epicOid, restGet
 
       const existingTests = await listChildAssets(restGet, "Test", existingStory.oid, ["Description", "ExpectedResults"]);
 
+      const matchedOids = new Set();
       for (const test of story.tests) {
-        // Test references are scenario positions, so they shift when a scenario is inserted or moved.
-        // Match by the exact scenario name; fall back to the reference only for a renamed scenario,
-        // i.e. a test whose current name no longer appears anywhere in the spec.
-        const existingTest =
-          existingTests.find((asset) => asset.name === test.name) ??
-          existingTests.find((asset) => asset.reference === test.ref && !specTestNames.has(asset.name)) ??
-          null;
+        const existingTest = matchExistingTest(existingTests, test, specTestNames, matchedOids);
+        if (existingTest) matchedOids.add(existingTest.oid);
 
         if (existingTest) {
           if (
