@@ -1,6 +1,6 @@
 import db from "../models/index.js";
 import logger from "../config/logger.js";
-import { emailRuntime, readSmtpConfig } from "./emailConfig.js";
+import { emailRuntime, readSmtpConfig, SEND_TIMEOUT_MS } from "./emailConfig.js";
 import { campusParts, addCalendarDays, reminderDepartureDate, REMINDER_START_HOUR } from "./campusClock.js";
 import { pickupReminderMessage } from "./messages.js";
 
@@ -70,19 +70,35 @@ function claimJob(due) {
         ? await db.reservationRequest.findByPk(due.reservationRequestId, { lock: transaction.LOCK.UPDATE, transaction })
         : null;
     const job = await db.reservationEmail.findByPk(due.id, { lock: transaction.LOCK.UPDATE, transaction });
-    if (!job || job.deliveryState !== "pending" || job.attemptCount >= MAX_ATTEMPTS || job.nextAttemptAt > instant) {
+    if (!job || job.deliveryState !== "pending" || job.nextAttemptAt > instant) {
       return null;
     }
     if (job.kind === "pickup_reminder" && !reminderStillEligible(request, job.notificationKey, instant)) {
       await job.update({ deliveryState: "skipped", nextAttemptAt: null }, { transaction });
-      return { skipped: true, job };
+      return { outcome: "skipped", job };
+    }
+    if (job.attemptCount >= MAX_ATTEMPTS) {
+      // The final attempt was claimed but its outcome was never recorded (process stopped or the
+      // update failed). Its claim has expired: close it as failed instead of leaving it pending.
+      await job.update({ deliveryState: "failed", nextAttemptAt: null }, { transaction });
+      return { outcome: "failed", job };
     }
     await job.update(
       { attemptCount: job.attemptCount + 1, nextAttemptAt: new Date(instant.getTime() + RETRY_DELAY_MS) },
       { transaction }
     );
-    return { skipped: false, job };
+    return { outcome: "claimed", job };
   });
+}
+
+/** A submission that has not settled in time counts as a failed attempt. */
+function withTimeout(submission) {
+  let timer;
+  const limit = emailRuntime.sendTimeoutMs ?? SEND_TIMEOUT_MS;
+  const expired = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error("EMAIL_SEND_TIMEOUT")), limit);
+  });
+  return Promise.race([submission, expired]).finally(() => clearTimeout(timer));
 }
 
 /** Submits every due pending job once; one transport failure never stops the rest. */
@@ -97,15 +113,20 @@ async function dispatchDue(instant, transport, from, counts) {
     const claim = await claimJob(candidate);
     if (!claim) continue;
     const { job } = claim;
-    if (claim.skipped) {
+    if (claim.outcome === "skipped") {
       counts.skipped += 1;
       logger.info(`EMAIL_SKIPPED id=${job.id} state=skipped`);
+      continue;
+    }
+    if (claim.outcome === "failed") {
+      counts.failed += 1;
+      logger.warn(`EMAIL_DELIVERY_FAILED id=${job.id} state=failed attempts=${job.attemptCount}`);
       continue;
     }
 
     let accepted = false;
     try {
-      await transport.sendMail({ from, to: job.recipient, subject: job.subject, text: job.body });
+      await withTimeout(transport.sendMail({ from, to: job.recipient, subject: job.subject, text: job.body }));
       accepted = true;
     } catch {
       // Provider errors can echo addresses or credentials, so only the fixed code below is logged.

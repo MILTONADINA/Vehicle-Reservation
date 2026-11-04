@@ -5,7 +5,8 @@
 import { jest } from "@jest/globals";
 import db from "../app/models/index.js";
 import logger from "../app/config/logger.js";
-import { runEmailCycle } from "../app/reservationEmails/emailCycle.js";
+import { runEmailCycle, RETRY_DELAY_MS } from "../app/reservationEmails/emailCycle.js";
+import { emailRuntime, SEND_TIMEOUT_MS } from "../app/reservationEmails/emailConfig.js";
 import { syncTestDatabase, signInAs } from "./helpers.js";
 import {
   installEmailRuntime,
@@ -18,6 +19,7 @@ import {
   sendNow,
   emailRows,
   captureLogs,
+  realCreateTransport,
 } from "./emailFixtures.js";
 
 const NOW = "2026-11-04T15:00:00.000Z";
@@ -134,6 +136,19 @@ describe("Feature 9 — Reservation Emails", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ id: job.id, deliveryState: "sent", attemptCount: 1 });
       expect(clock.transport.sent.map((m) => m.text)).toEqual([job.body]);
+
+      // The process stopped after claiming the final attempt but before recording its outcome:
+      // the job must not stay pending forever, and no fourth submission is made.
+      const interrupted = await committedTransition({ departureDate: "2026-12-09", returnDate: "2026-12-09" });
+      await db.reservationEmail.update(
+        { attemptCount: 3, nextAttemptAt: minutesAfter(clock.now.toISOString(), 5) },
+        { where: { id: interrupted.job.id } }
+      );
+      clock.advanceMinutes(5);
+      const attemptsBefore = clock.transport.attempts.length;
+      expect(await registerOnStubCron().tick()).toMatchObject({ sent: 0, failed: 1 });
+      expect(clock.transport.attempts).toHaveLength(attemptsBefore);
+      expect((await emailRows({ id: interrupted.job.id }))[0]).toMatchObject({ deliveryState: "failed", attemptCount: 3, nextAttemptAt: null });
     });
 
     it("Concurrent dispatchers serialize a notification attempt", async () => {
@@ -142,6 +157,26 @@ describe("Feature 9 — Reservation Emails", () => {
       expect(results.reduce((sum, counts) => sum + counts.sent, 0)).toBe(1);
       expect(clock.transport.attempts).toHaveLength(1);
       expect((await emailRows())[0]).toMatchObject({ deliveryState: "sent", attemptCount: 1 });
+
+      // A submission ends well before its claim expires, so a slow provider cannot let a second
+      // dispatcher claim and resubmit the job while the first submission is still in flight.
+      expect(SEND_TIMEOUT_MS).toBeLessThan(RETRY_DELAY_MS);
+      const smtp = realCreateTransport({ host: "smtp.test.invalid", port: 587, secure: false, user: null, password: null });
+      const options = smtp.transporter.options;
+      smtp.close();
+      for (const key of ["connectionTimeout", "greetingTimeout", "socketTimeout"]) {
+        expect(options[key]).toBeGreaterThan(0);
+        expect(options[key]).toBeLessThan(RETRY_DELAY_MS);
+      }
+      const { job: hung } = await committedTransition({ departureDate: "2026-12-09", returnDate: "2026-12-09" });
+      clock.transport.sendMail = () => new Promise(() => {});
+      emailRuntime.sendTimeoutMs = 50;
+      try {
+        expect(await scheduled.tick()).toMatchObject({ sent: 0, retryScheduled: 1 });
+      } finally {
+        delete emailRuntime.sendTimeoutMs;
+      }
+      expect((await emailRows({ id: hung.id }))[0]).toMatchObject({ deliveryState: "pending", attemptCount: 1 });
     });
 
     it("Missing email configuration preserves pending jobs", async () => {

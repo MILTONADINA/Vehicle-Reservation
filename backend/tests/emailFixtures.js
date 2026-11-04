@@ -20,6 +20,8 @@ export const SMTP_ENV = {
 };
 
 const original = { now: emailRuntime.now, createTransport: emailRuntime.createTransport };
+/** The production transport factory, before any test replaces it. */
+export const realCreateTransport = original.createTransport;
 const savedEnv = {};
 
 /** A deterministic transport: records every submission and fails the ones `fail(message)` selects. */
