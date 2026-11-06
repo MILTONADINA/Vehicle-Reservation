@@ -29,6 +29,9 @@ vi.mock("../src/services/driverServices.js", () => ({
 vi.mock("../src/services/destinationServices.js", () => ({
   default: { getOptions: vi.fn(), getAll: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
 }));
+vi.mock("../src/services/issueServices.js", () => ({
+  default: { listOpen: vi.fn(), listForRequest: vi.fn(), createForRequest: vi.fn() },
+}));
 
 const areaAthletics = { id: 1, areaName: "Athletics", areaLogo: "https://example.org/logo.png", noticeEmail: "Return clean." };
 const areaAcademics = { id: 2, areaName: "Academics", areaLogo: "https://example.org/logo2.png", noticeEmail: "Keys." };
