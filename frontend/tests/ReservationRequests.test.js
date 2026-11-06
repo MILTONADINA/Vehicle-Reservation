@@ -131,6 +131,17 @@ async function choose(id, value) {
   }
   throw new Error(`could not set select ${id}`);
 }
+function selectItems(id) {
+  const field = byTestId(id);
+  if (!field) throw new Error(`no element with data-testid=${id}`);
+  let instance = field.__vueParentComponent;
+  while (instance) {
+    const props = instance.props || {};
+    if (Array.isArray(props.items)) return props.items;
+    instance = instance.parent;
+  }
+  throw new Error(`could not read select items for ${id}`);
+}
 const fieldValue = (id) => document.querySelector(`[data-testid="${id}"] input, [data-testid="${id}"] textarea`)?.value;
 const rows = (wrapper) => wrapper.findAll('[data-testid="request-row"]');
 
@@ -287,6 +298,54 @@ describe("Feature 7 — Reservation Requests", () => {
       expect(bodyText()).toContain("Note text");
       expect(byTestId("save-request").textContent).toContain("Save");
       expect(byTestId("cancel-dialog").textContent).toContain("Cancel");
+    });
+
+    it("Add request offers only approved drivers and active destinations", async () => {
+      const wrapper = await openRequests("requestor");
+      await wrapper.find('[data-testid="add-request"]').trigger("click");
+      await flushPromises();
+      expect(dialogOpen("request-dialog")).toBe(true);
+      expect(selectItems("request-driver").map((d) => d.id)).toEqual([driverJordan.id, driverAvery.id]);
+      expect(selectItems("request-driver").every((d) => d.status === "approved")).toBe(true);
+      expect(selectItems("request-destination").map((d) => d.id)).toEqual([destOKC.id, destTulsa.id]);
+      expect(selectItems("request-destination").every((d) => d.status === "active")).toBe(true);
+      wrapper.unmount();
+      mounted.pop();
+    });
+
+    it("Edit and Cancel are hidden on non-requested rows", async () => {
+      Utils.setStore("user", { ...account("requestor"), token: "session-token" });
+      AuthServices.me.mockResolvedValue({ data: account("requestor") });
+      const cancelledOwn = {
+        ...reqCatalog,
+        id: 20,
+        status: "cancelled",
+        purpose: "Already cancelled",
+      };
+      const awaitingOwn = {
+        ...reqFreetext,
+        id: 21,
+        status: "awaiting_vehicle",
+        purpose: "Waiting on vehicle",
+      };
+      ReservationRequestServices.getAll.mockResolvedValue({ data: [reqCatalog, cancelledOwn, awaitingOwn] });
+      AreaServices.getAll.mockResolvedValue({ data: areaList });
+      DriverServices.getAll.mockResolvedValue({ data: driverList });
+      DestinationServices.getAll.mockResolvedValue({ data: destList });
+      const wrapper = await mountApp("/reservation-requests");
+      expect(rows(wrapper)).toHaveLength(3);
+      expect(wrapper.findAll('[data-testid="edit-request"]')).toHaveLength(1);
+      expect(wrapper.findAll('[data-testid="cancel-request"]')).toHaveLength(1);
+      const actionable = rows(wrapper).find((row) => row.text().includes("Conference shuttle"));
+      expect(actionable.find('[data-testid="edit-request"]').exists()).toBe(true);
+      expect(actionable.find('[data-testid="cancel-request"]').exists()).toBe(true);
+      for (const purpose of ["Already cancelled", "Waiting on vehicle"]) {
+        const row = rows(wrapper).find((r) => r.text().includes(purpose));
+        expect(row.find('[data-testid="edit-request"]').exists()).toBe(false);
+        expect(row.find('[data-testid="cancel-request"]').exists()).toBe(false);
+      }
+      wrapper.unmount();
+      mounted.pop();
     });
 
     it("Saving a reservation request updates the list", async () => {

@@ -206,6 +206,55 @@ describe("Feature 7 — Reservation Requests", () => {
       expect(response.body).toEqual([]);
     });
 
+    it("Reservation request list sorts by date, null times first, then id", async () => {
+      const { user, token } = await signInAs("requestor");
+      const base = { ...validCatalogBody(), requestorUserId: user.id, status: "requested", returnDate: "2026-12-01", returnTime: null };
+
+      const nullEarly = await db.reservationRequest.create({
+        ...base,
+        departureDate: "2026-12-01",
+        departureTime: null,
+        purpose: "null-early",
+      });
+      const timedLate = await db.reservationRequest.create({
+        ...base,
+        departureDate: "2026-12-01",
+        departureTime: "09:00",
+        returnTime: "17:00",
+        purpose: "timed-late",
+      });
+      const nullLate = await db.reservationRequest.create({
+        ...base,
+        departureDate: "2026-12-01",
+        departureTime: null,
+        purpose: "null-late",
+      });
+      const timedEarly = await db.reservationRequest.create({
+        ...base,
+        departureDate: "2026-12-01",
+        departureTime: "08:00",
+        returnTime: "17:00",
+        purpose: "timed-early",
+      });
+      const timedSame = await db.reservationRequest.create({
+        ...base,
+        departureDate: "2026-12-01",
+        departureTime: "09:00",
+        returnTime: "17:00",
+        purpose: "timed-same",
+      });
+
+      const response = await listRequests(token);
+      expect(response.status).toBe(200);
+      expect(response.body.map((r) => r.id)).toEqual([
+        nullEarly.id,
+        nullLate.id,
+        timedEarly.id,
+        timedLate.id,
+        timedSame.id,
+      ]);
+    });
+
     it("Empty reservation request list is returned", async () => {
       const { token } = await signInAs("requestor");
       const response = await listRequests(token);
@@ -376,6 +425,53 @@ describe("Feature 7 — Reservation Requests", () => {
         expect(response.status).toBe(400);
         expect(response.body).toEqual({ message: "Invalid reservation request data." });
       }
+      expect(await db.reservationRequest.count()).toBe(0);
+    });
+
+    it("Impossible dates and out-of-range times are rejected", async () => {
+      const { token } = await signInAs("requestor");
+      for (const body of [
+        validCatalogBody({ departureDate: "2026-02-30", returnDate: "2026-03-01" }),
+        validCatalogBody({ departureTime: "25:00", returnTime: "17:00" }),
+        validCatalogBody({
+          departureDate: "2026-12-01",
+          departureTime: "10:00",
+          returnDate: "2026-12-01",
+          returnTime: "10:00",
+        }),
+      ]) {
+        const response = await createRequest(token, body);
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: "Invalid reservation request data." });
+      }
+      expect(await db.reservationRequest.count()).toBe(0);
+    });
+
+    it("Whole-day trip on a single date is accepted", async () => {
+      const { user, token } = await signInAs("requestor");
+      const body = validFreetextBody({
+        departureDate: "2026-12-01",
+        departureTime: null,
+        returnDate: "2026-12-01",
+        returnTime: null,
+      });
+      const response = await createRequest(token, body);
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        requestorUserId: user.id,
+        departureDate: "2026-12-01",
+        returnDate: "2026-12-01",
+        departureTime: null,
+        returnTime: null,
+        status: "requested",
+      });
+    });
+
+    it("Unknown noteType is rejected", async () => {
+      const { token } = await signInAs("requestor");
+      const response = await createRequest(token, validCatalogBody({ noteType: "urgent", noteText: "Please hurry" }));
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "Invalid reservation request data." });
       expect(await db.reservationRequest.count()).toBe(0);
     });
 
