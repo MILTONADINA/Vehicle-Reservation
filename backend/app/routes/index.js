@@ -7,6 +7,7 @@ import driverRoutes from "./driver.routes.js";
 import destinationRoutes from "./destination.routes.js";
 import reservationRequestRoutes from "./reservationRequest.routes.js";
 import reservationEmailRoutes from "./reservationEmail.routes.js";
+import issueRoutes from "./issue.routes.js";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use("/drivers", driverRoutes);
 router.use("/destinations", destinationRoutes);
 router.use("/reservation-requests", reservationRequestRoutes);
 router.use("/reservation-emails", reservationEmailRoutes);
+router.use("/issues", issueRoutes);
 
 export default router;

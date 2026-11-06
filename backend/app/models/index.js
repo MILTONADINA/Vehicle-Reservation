@@ -8,6 +8,7 @@ import driverModel from "./driver.model.js";
 import destinationModel from "./destination.model.js";
 import reservationRequestModel from "./reservationRequest.model.js";
 import reservationEmailModel from "./reservationEmail.model.js";
+import issueReportModel from "./issueReport.model.js";
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -21,6 +22,7 @@ db.driver = driverModel(sequelize, Sequelize);
 db.destination = destinationModel(sequelize, Sequelize);
 db.reservationRequest = reservationRequestModel(sequelize, Sequelize);
 db.reservationEmail = reservationEmailModel(sequelize, Sequelize);
+db.issueReport = issueReportModel(sequelize, Sequelize);
 
 // Sessions belong to one user and are deleted with that user.
 const sessionUserKey = { name: "userId", allowNull: false };
@@ -66,5 +68,20 @@ db.reservationRequest.belongsTo(db.vehicle, { foreignKey: requestVehicleKey, as:
 const emailRequestKey = { name: "reservationRequestId", allowNull: false };
 db.reservationRequest.hasMany(db.reservationEmail, { foreignKey: emailRequestKey, as: "emails", onDelete: "RESTRICT" });
 db.reservationEmail.belongsTo(db.reservationRequest, { foreignKey: emailRequestKey, as: "reservationRequest", onDelete: "RESTRICT" });
+
+// Issue reports belong to one reservation request. A request with issues cannot be deleted.
+const issueRequestKey = { name: "requestId", allowNull: false };
+db.reservationRequest.hasMany(db.issueReport, { foreignKey: issueRequestKey, as: "issues", onDelete: "RESTRICT" });
+db.issueReport.belongsTo(db.reservationRequest, { foreignKey: issueRequestKey, as: "reservationRequest", onDelete: "RESTRICT" });
+
+// An issue may snapshot the request's assigned vehicle. A vehicle with issues cannot be deleted.
+const issueVehicleKey = { name: "vehicleId", allowNull: true };
+db.vehicle.hasMany(db.issueReport, { foreignKey: issueVehicleKey, as: "issueReports", onDelete: "RESTRICT" });
+db.issueReport.belongsTo(db.vehicle, { foreignKey: issueVehicleKey, as: "vehicle", onDelete: "RESTRICT" });
+
+// The signed-in reporter owns the issue row. A user who reported an issue cannot be deleted.
+const issueReporterKey = { name: "reportedByUserId", allowNull: false };
+db.user.hasMany(db.issueReport, { foreignKey: issueReporterKey, as: "issueReports", onDelete: "RESTRICT" });
+db.issueReport.belongsTo(db.user, { foreignKey: issueReporterKey, as: "reporter", onDelete: "RESTRICT" });
 
 export default db;

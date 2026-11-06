@@ -128,6 +128,21 @@ Internal delivery records (Sequelize table `reservationEmails`); no API returns 
 
 Unique index `reservation_emails_request_kind_key` on `(reservationRequestId, kind, notificationKey)`: one job per status event or per departure-date reminder.
 
+### `issue_reports`
+
+Sequelize table `issueReports`.
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| requestId | Integer | Required foreign key to `reservation_requests.id`, `ON DELETE RESTRICT` |
+| vehicleId | Integer, nullable | Foreign key to `vehicles.id`, `ON DELETE RESTRICT`; copied from the request at create time |
+| issueType | Enum | `low_gas`, `dirty`, or `maintenance_need` |
+| timing | Enum | `before`, `during`, or `after` |
+| note | String(1000), nullable | Optional; trimmed; blank becomes null; case and internal spaces kept |
+| reportedByUserId | Integer | Required foreign key to `users.id`, `ON DELETE RESTRICT`; always the signed-in user |
+| createdAt, updatedAt | DateTime | Sequelize timestamps; API returns `createdAt` |
+
 ## Associations
 
 | Association | Options | Introduced |
@@ -141,6 +156,9 @@ Unique index `reservation_emails_request_kind_key` on `(reservationRequestId, ki
 | `destination.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(destination, { as: "destination" })` | `foreignKey: destinationId` (nullable), `onDelete: RESTRICT` — a destination with requests cannot be deleted | Feature 7 |
 | `vehicle.hasMany(reservationRequest, { as: "reservationRequests" })` / `reservationRequest.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (nullable), `onDelete: RESTRICT` — a vehicle referenced by a reserved/returned request cannot be deleted | Feature 8 |
 | `reservationRequest.hasMany(reservationEmail, { as: "emails" })` / `reservationEmail.belongsTo(reservationRequest, { as: "reservationRequest" })` | `foreignKey: reservationRequestId` (not null), `onDelete: RESTRICT` — no request-delete route exists, so this adds no 409 response | Feature 9 |
+| `reservationRequest.hasMany(issueReport, { as: "issues" })` / `issueReport.belongsTo(reservationRequest, { as: "reservationRequest" })` | `foreignKey: requestId` (not null), `onDelete: RESTRICT` | Feature 10 |
+| `vehicle.hasMany(issueReport, { as: "issueReports" })` / `issueReport.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (nullable), `onDelete: RESTRICT` — deleting a vehicle with issues returns 409 `Vehicle is in use.` | Feature 10 |
+| `user.hasMany(issueReport, { as: "issueReports" })` / `issueReport.belongsTo(user, { as: "reporter" })` | `foreignKey: reportedByUserId` (not null), `onDelete: RESTRICT` — deleting a reporter returns 409 `User is in use.` | Feature 10 |
 
 Drivers have no foreign keys to users, areas, or vehicles. Destinations have no foreign keys to users, areas, vehicles, or drivers.
 
@@ -156,3 +174,4 @@ Drivers have no foreign keys to users, areas, or vehicles. Destinations have no 
 | reservation_requests | Feature 7 |
 | reservation_requests.vehicleId, reservation_requests.statusReason, vehicle association | Feature 8 |
 | reservation_emails | Feature 9 |
+| issue_reports | Feature 10 |

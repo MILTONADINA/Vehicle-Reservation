@@ -31,6 +31,9 @@ vi.mock("../src/services/driverServices.js", () => ({
 vi.mock("../src/services/destinationServices.js", () => ({
   default: { getOptions: vi.fn(), getAll: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
 }));
+vi.mock("../src/services/issueServices.js", () => ({
+  default: { listOpen: vi.fn(), listForRequest: vi.fn(), createForRequest: vi.fn() },
+}));
 
 const area = { id: 1, areaName: "Athletics", areaLogo: "https://example.org/logo.png", noticeEmail: "Return clean." };
 const driver = { id: 1, firstName: "Jordan", lastName: "Lee", licenseState: "OK", licenseExpireDate: "2028-06-30", approvedDate: "2026-01-15", status: "approved" };

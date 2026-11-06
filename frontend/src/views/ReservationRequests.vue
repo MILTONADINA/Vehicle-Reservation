@@ -5,6 +5,7 @@ import ReservationEmailServices from "../services/reservationEmailServices.js";
 import AreaServices from "../services/areaServices.js";
 import DriverServices from "../services/driverServices.js";
 import DestinationServices from "../services/destinationServices.js";
+import IssueServices from "../services/issueServices.js";
 import Utils from "../config/utils.js";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -12,6 +13,26 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MILES_PATTERN = /^\d+(\.\d)?$/;
 const NOTE_TYPES = ["general", "special_instructions", "other"];
 const NOTE_TYPE_SET = new Set(NOTE_TYPES);
+const ISSUE_TYPES = [
+  { title: "Low gas", value: "low_gas" },
+  { title: "Dirty", value: "dirty" },
+  { title: "Maintenance need", value: "maintenance_need" },
+];
+const ISSUE_TIMINGS = [
+  { title: "Before", value: "before" },
+  { title: "During", value: "during" },
+  { title: "After", value: "after" },
+];
+const ISSUE_TYPE_LABELS = {
+  low_gas: "Low gas",
+  dirty: "Dirty",
+  maintenance_need: "Maintenance need",
+};
+const TIMING_LABELS = {
+  before: "Before",
+  during: "During",
+  after: "After",
+};
 
 const user = ref(Utils.getStore("user"));
 const refreshUser = () => { user.value = Utils.getStore("user"); };
@@ -497,6 +518,119 @@ async function saveStatus() {
     statusDialog.saving = false;
   }
 }
+
+function canViewRequestIssues(req) {
+  if (!req) return false;
+  if (isAdmin.value) return true;
+  if (isAreaAdmin.value) return req.areaId === user.value?.areaId;
+  if (isRequestor.value) return req.requestorUserId === user.value?.userId;
+  return false;
+}
+
+function canReportIssue(req) {
+  return canViewRequestIssues(req);
+}
+
+const selectedRequest = ref(null);
+const requestIssues = ref([]);
+const issuesLoading = ref(false);
+const issuesLoaded = ref(false);
+const issuesError = ref("");
+
+async function loadRequestIssues(requestId) {
+  issuesLoading.value = true;
+  issuesError.value = "";
+  try {
+    const { data } = await IssueServices.listForRequest(requestId);
+    requestIssues.value = data;
+    issuesLoaded.value = true;
+  } catch (reason) {
+    requestIssues.value = [];
+    issuesError.value = reason.response?.data?.message || "Issues could not be loaded.";
+  } finally {
+    issuesLoading.value = false;
+  }
+}
+
+async function openRequestIssues(req) {
+  if (!canViewRequestIssues(req)) return;
+  selectedRequest.value = req;
+  issuesLoaded.value = false;
+  requestIssues.value = [];
+  await loadRequestIssues(req.id);
+}
+
+function reporterLabel(issue) {
+  if (issue.reportedByUserId === user.value?.userId) {
+    return `${user.value.firstName} ${user.value.lastName}`.trim();
+  }
+  return `User ${issue.reportedByUserId}`;
+}
+
+const issueDialog = reactive({
+  open: false,
+  saving: false,
+  error: "",
+  form: { issueType: null, timing: null, note: "" },
+});
+const issueFormRef = ref(null);
+
+function emptyIssueForm() {
+  return { issueType: null, timing: null, note: "" };
+}
+
+async function openIssueDialog() {
+  if (!selectedRequest.value || !canReportIssue(selectedRequest.value)) return;
+  issueDialog.form = emptyIssueForm();
+  issueDialog.error = "";
+  issueDialog.open = true;
+  await nextTick();
+  issueFormRef.value?.resetValidation();
+}
+
+function cancelIssueDialog() {
+  issueFormRef.value?.resetValidation();
+  issueDialog.open = false;
+  issueDialog.error = "";
+  issueDialog.form = emptyIssueForm();
+}
+
+function validIssueFields(form) {
+  if (!ISSUE_TYPES.some((item) => item.value === form.issueType)) return null;
+  if (!ISSUE_TIMINGS.some((item) => item.value === form.timing)) return null;
+  let note = null;
+  if (form.note !== null && form.note !== undefined && form.note !== "") {
+    if (typeof form.note !== "string") return null;
+    const trimmed = form.note.trim();
+    if (trimmed.length > 1000) return null;
+    note = trimmed.length === 0 ? null : trimmed;
+  }
+  return { issueType: form.issueType, timing: form.timing, note };
+}
+
+async function saveIssue() {
+  if (issueDialog.saving || !selectedRequest.value) return;
+  const fields = validIssueFields(issueDialog.form);
+  if (!fields) {
+    issueDialog.error = "Invalid issue data.";
+    return;
+  }
+  const body = { issueType: fields.issueType, timing: fields.timing };
+  if (fields.note !== null) body.note = fields.note;
+
+  issueDialog.saving = true;
+  issueDialog.error = "";
+  try {
+    await IssueServices.createForRequest(selectedRequest.value.id, body);
+    issueDialog.open = false;
+    issueDialog.form = emptyIssueForm();
+    await loadRequestIssues(selectedRequest.value.id);
+  } catch (reason) {
+    issueDialog.error = reason.response?.data?.message || "Issue could not be saved.";
+  } finally {
+    issueDialog.saving = false;
+  }
+}
 </script>
 
 <template>
@@ -565,10 +699,50 @@ async function saveStatus() {
             <v-btn v-if="isRequestor && req.requestorUserId === user?.userId && req.status === 'requested'" size="small" variant="text" color="error" data-testid="cancel-request" @click="openCancel(req)">Cancel</v-btn>
             <v-btn v-if="isProcessor && allowedTransitions(req).length > 0" size="small" variant="text" color="primary" data-testid="status-change" @click="openStatusDialog(req)">Change status</v-btn>
             <v-btn v-if="isProcessor && req.status === 'reserved'" size="small" variant="text" color="success" data-testid="mark-returned" @click="openMarkReturned(req)">Mark returned</v-btn>
+            <v-btn v-if="canViewRequestIssues(req)" size="small" variant="text" color="primary" data-testid="view-issues" @click="openRequestIssues(req)">Issues</v-btn>
           </td>
         </tr>
       </tbody>
     </v-table>
+
+    <div v-if="selectedRequest" class="mt-8" data-testid="request-issues-section">
+      <div class="d-flex align-center justify-space-between mb-4">
+        <h2 class="text-h5">Issues for request {{ selectedRequest.id }}</h2>
+        <v-btn
+          v-if="canReportIssue(selectedRequest)"
+          color="primary"
+          variant="elevated"
+          class="oc-cta"
+          data-testid="report-issue"
+          @click="openIssueDialog"
+        >Report issue</v-btn>
+      </div>
+
+      <v-progress-circular v-if="issuesLoading" indeterminate color="primary" data-testid="request-issues-loading" />
+      <v-alert v-else-if="issuesError" type="error" density="compact" data-testid="request-issues-error">{{ issuesError }}</v-alert>
+      <p v-else-if="issuesLoaded && requestIssues.length === 0" class="text-body-1" data-testid="request-issues-empty">No issues found.</p>
+
+      <v-table v-if="!issuesLoading && !issuesError && requestIssues.length > 0" data-testid="request-issues-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>When</th>
+            <th>Note</th>
+            <th>Reporter</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="issue in requestIssues" :key="issue.id" data-testid="request-issue-row">
+            <td>{{ ISSUE_TYPE_LABELS[issue.issueType] || issue.issueType }}</td>
+            <td>{{ TIMING_LABELS[issue.timing] || issue.timing }}</td>
+            <td>{{ issue.note || "" }}</td>
+            <td>{{ reporterLabel(issue) }}</td>
+            <td>{{ issue.createdAt ? new Date(issue.createdAt).toLocaleString() : "" }}</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </div>
 
     <v-dialog v-model="dialog.open" max-width="640" persistent>
       <v-card rounded="lg" class="pa-6" data-testid="request-dialog">
@@ -673,6 +847,37 @@ async function saveStatus() {
           <v-btn color="secondary" variant="text" class="mr-2" :disabled="statusDialog.saving" data-testid="cancel-status" @click="cancelStatusDialog">Cancel</v-btn>
           <v-btn color="primary" variant="elevated" class="oc-cta" :loading="statusDialog.saving" :disabled="statusDialog.saving" data-testid="save-status" @click="saveStatus">Save</v-btn>
         </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="issueDialog.open" max-width="480" persistent>
+      <v-card rounded="lg" class="pa-6" data-testid="issue-dialog">
+        <h2 class="text-h6 mb-4">Report issue</h2>
+        <v-alert v-if="issueDialog.error" type="error" density="compact" class="mb-4" data-testid="issue-form-error">{{ issueDialog.error }}</v-alert>
+        <v-form ref="issueFormRef" @submit.prevent="saveIssue">
+          <v-select
+            v-model="issueDialog.form.issueType"
+            label="Issue type"
+            :items="ISSUE_TYPES"
+            data-testid="issue-type"
+          />
+          <v-select
+            v-model="issueDialog.form.timing"
+            label="When"
+            :items="ISSUE_TIMINGS"
+            data-testid="issue-timing"
+          />
+          <v-textarea
+            v-model="issueDialog.form.note"
+            label="Note"
+            maxlength="1000"
+            data-testid="issue-note"
+          />
+          <div class="d-flex justify-end mt-4">
+            <v-btn color="secondary" variant="text" class="mr-2" :disabled="issueDialog.saving" data-testid="cancel-issue" @click="cancelIssueDialog">Cancel</v-btn>
+            <v-btn type="submit" color="primary" variant="elevated" class="oc-cta" :loading="issueDialog.saving" :disabled="issueDialog.saving" data-testid="save-issue">Save</v-btn>
+          </div>
+        </v-form>
       </v-card>
     </v-dialog>
   </v-container>
