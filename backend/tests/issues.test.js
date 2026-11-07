@@ -2,6 +2,7 @@
  * Feature 10 — Vehicle Issue Reports
  * Spec: features/feature-10-vehicle-issue-reports.md
  */
+import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../server.js";
 import db from "../app/models/index.js";
@@ -254,6 +255,7 @@ describe("Feature 10 — Vehicle Issue Reports", () => {
 
     it("Client cannot choose vehicle id or reporter", async () => {
       const { user, token } = await signInAs("requestor");
+      const { user: otherUser } = await signInAs("requestor");
       const vehicle = await makeVehicle();
       const otherVehicle = await makeVehicle();
       const reservation = await makeRequest({
@@ -266,12 +268,13 @@ describe("Feature 10 — Vehicle Issue Reports", () => {
         issueType: "maintenance_need",
         timing: "during",
         vehicleId: otherVehicle.id,
-        reportedByUserId: 1,
+        reportedByUserId: otherUser.id,
       });
 
       expect(response.status).toBe(201);
       expect(response.body.vehicleId).toBe(vehicle.id);
       expect(response.body.reportedByUserId).toBe(user.id);
+      expect(response.body.reportedByUserId).not.toBe(otherUser.id);
     });
   });
 
@@ -390,6 +393,38 @@ describe("Feature 10 — Vehicle Issue Reports", () => {
       expect(response.status).toBe(403);
       expect(response.body).toEqual({ message: "Forbidden." });
     });
+
+    it("Listing issues on another users request is rejected", async () => {
+      const { token } = await signInAs("requestor");
+      const { user: other } = await signInAs("requestor");
+      const reservation = await makeRequest({ requestorUserId: other.id });
+      await db.issueReport.create({
+        requestId: reservation.id,
+        issueType: "dirty",
+        timing: "before",
+        reportedByUserId: other.id,
+      });
+
+      const response = await listForRequest(token, reservation.id);
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ message: `Reservation request with id=${reservation.id} not found.` });
+    });
+
+    it("Area admin cannot list issues for another areas request", async () => {
+      const { user: requestor } = await signInAs("requestor");
+      const { token } = await signInAs("area_admin", { areaId: area2.id });
+      const reservation = await makeRequest({ requestorUserId: requestor.id, areaId: area1.id });
+      await db.issueReport.create({
+        requestId: reservation.id,
+        issueType: "low_gas",
+        timing: "after",
+        reportedByUserId: requestor.id,
+      });
+
+      const response = await listForRequest(token, reservation.id);
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ message: `Reservation request with id=${reservation.id} not found.` });
+    });
   });
 
   describe("US-10.3 — Restrict issue actions", () => {
@@ -426,6 +461,16 @@ describe("Feature 10 — Vehicle Issue Reports", () => {
       expect(response.status).toBe(403);
       expect(response.body).toEqual({ message: "Forbidden." });
       expect(await issueSnapshot()).toEqual(before);
+    });
+
+    it("Maintenance cannot list issues for one request", async () => {
+      const { user: requestor } = await signInAs("requestor");
+      const { token } = await signInAs("maintenance");
+      const reservation = await makeRequest({ requestorUserId: requestor.id });
+
+      const response = await listForRequest(token, reservation.id);
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ message: "Forbidden." });
     });
 
     it("Invalid reservation request route id is rejected for issues", async () => {
@@ -494,6 +539,28 @@ describe("Feature 10 — Vehicle Issue Reports", () => {
       expect(response.body).toEqual({ message: "Vehicle is in use." });
       expect(await db.vehicle.findByPk(vehicle.id)).not.toBeNull();
       expect(await db.issueReport.findByPk(issue.id)).not.toBeNull();
+    });
+
+    it("Issue storage failures return a safe error", async () => {
+      const { user, token } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+      const reservation = await makeRequest({ requestorUserId: user.id });
+      const before = await issueSnapshot();
+      const body = { issueType: "low_gas", timing: "after", note: "Near empty" };
+      const failures = [
+        [() => jest.spyOn(db.issueReport, "create").mockRejectedValueOnce(new Error("SQLSTATE connection lost")), () => createIssue(token, reservation.id, body)],
+        [() => jest.spyOn(db.issueReport, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost")), () => listForRequest(token, reservation.id)],
+        [() => jest.spyOn(db.issueReport, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost")), () => listOpen(adminToken)],
+      ];
+      for (const [arm, run] of failures) {
+        const spy = arm();
+        const response = await run();
+        spy.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ message: "Issue request failed." });
+        expect(JSON.stringify(response.body)).not.toMatch(/SQLSTATE|connection lost/i);
+      }
+      expect(await issueSnapshot()).toEqual(before);
     });
   });
 });

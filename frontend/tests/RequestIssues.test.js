@@ -194,6 +194,45 @@ describe("Feature 10 — Request Issues", () => {
       expect(wrapper.text()).toContain("Tank was near empty on return.");
     });
 
+    it("Saving an issue blocks duplicate submits", async () => {
+      const created = {
+        id: 2,
+        requestId: 10,
+        vehicleId: 3,
+        issueType: "dirty",
+        timing: "during",
+        note: null,
+        reportedByUserId: 7,
+        createdAt: "2026-10-27T18:30:00.000Z",
+      };
+      let resolveSave;
+      IssueServices.createForRequest.mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
+      IssueServices.listForRequest
+        .mockResolvedValueOnce({ data: [] })
+        .mockResolvedValueOnce({ data: [created] });
+
+      const wrapper = await openRequests("requestor");
+      await wrapper.find('[data-testid="view-issues"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-testid="report-issue"]').trigger("click");
+      await flushPromises();
+      await choose("issue-type", "dirty");
+      await choose("issue-timing", "during");
+      await click("save-issue");
+      await click("save-issue");
+      expect(IssueServices.createForRequest).toHaveBeenCalledTimes(1);
+      expect(IssueServices.createForRequest).toHaveBeenCalledWith(10, {
+        issueType: "dirty",
+        timing: "during",
+      });
+      expect(byTestId("save-issue").disabled).toBe(true);
+
+      resolveSave({ data: created });
+      await flushPromises();
+      expect(dialogOpen("issue-dialog")).toBe(false);
+      expect(IssueServices.listForRequest).toHaveBeenCalledTimes(2);
+    });
+
     it("Failed issue save keeps the dialog open", async () => {
       IssueServices.createForRequest.mockRejectedValue(apiError(400, "Invalid issue data."));
       const wrapper = await openRequests("requestor");
