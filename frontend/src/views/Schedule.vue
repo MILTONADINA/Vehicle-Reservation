@@ -14,19 +14,35 @@ onBeforeUnmount(() => window.removeEventListener("user-logged-in", refreshUser))
 const isAdmin = computed(() => user.value?.role === "admin");
 const canSeeSchedule = computed(() => ["admin", "area_admin"].includes(user.value?.role));
 
+const CAMPUS_TIME_ZONE = "America/Chicago";
+const campusDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: CAMPUS_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const campusWeekdayFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: CAMPUS_TIME_ZONE,
+  weekday: "short",
+});
+const WEEKDAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
 function addDays(date, days) {
   const [year, month, day] = date.split("-").map(Number);
   const moved = new Date(Date.UTC(year, month - 1, day + days));
   return moved.toISOString().slice(0, 10);
 }
 
+function campusDate(instant = new Date()) {
+  const parts = Object.fromEntries(campusDateFormatter.formatToParts(instant).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 function mondayOf(instant = new Date()) {
-  const y = instant.getUTCFullYear();
-  const m = instant.getUTCMonth();
-  const d = instant.getUTCDate();
-  const weekday = new Date(Date.UTC(y, m, d)).getUTCDay();
+  const date = campusDate(instant);
+  const weekday = WEEKDAY[campusWeekdayFormatter.format(instant)];
   const offset = weekday === 0 ? -6 : 1 - weekday;
-  return addDays(`${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`, offset);
+  return addDays(date, offset);
 }
 
 const weekStart = ref(mondayOf());

@@ -215,6 +215,106 @@ describe("Feature 11 — Weekly Vehicle Schedule", () => {
       expect(item.vehicleLabel).toContain("Ford Transit");
       expect(item.vehicleLabel).toContain("OC-4521");
     });
+
+    it("Week overlap includes Monday start and Sunday end bounds", async () => {
+      const { user: requestor } = await signInAs("requestor");
+      const { token } = await signInAs("admin");
+      const endsAtWeekStart = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-01",
+        departureTime: "08:00",
+        returnDate: "2026-11-02",
+        returnTime: "00:00",
+        status: "reserved",
+      });
+      const startsAtWeekEnd = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-08",
+        departureTime: "23:59",
+        returnDate: "2026-11-09",
+        returnTime: "08:00",
+        status: "reserved",
+      });
+      const wholeDayOnMonday = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-02",
+        departureTime: null,
+        returnDate: "2026-11-02",
+        returnTime: null,
+        status: "requested",
+      });
+      const endsBeforeWeek = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-01",
+        departureTime: "08:00",
+        returnDate: "2026-11-01",
+        returnTime: "23:59",
+        status: "reserved",
+      });
+      const startsAfterWeek = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-09",
+        departureTime: "00:00",
+        returnDate: "2026-11-09",
+        returnTime: "12:00",
+        status: "reserved",
+      });
+
+      const response = await getSchedule(token, { weekStart: WEEK });
+      expect(response.status).toBe(200);
+      const ids = response.body.items.map((row) => row.id);
+      expect(ids).toContain(endsAtWeekStart.id);
+      expect(ids).toContain(startsAtWeekEnd.id);
+      expect(ids).toContain(wholeDayOnMonday.id);
+      expect(ids).not.toContain(endsBeforeWeek.id);
+      expect(ids).not.toContain(startsAfterWeek.id);
+    });
+
+    it("Schedule items sort by date null times then id", async () => {
+      const { user: requestor } = await signInAs("requestor");
+      const { token } = await signInAs("admin");
+      const timedLater = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-03",
+        departureTime: "14:00",
+        returnDate: "2026-11-03",
+        returnTime: "18:00",
+        status: "requested",
+      });
+      const timedEarlier = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-03",
+        departureTime: "09:00",
+        returnDate: "2026-11-03",
+        returnTime: "12:00",
+        status: "requested",
+      });
+      const nullTimeFirst = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-03",
+        departureTime: null,
+        returnDate: "2026-11-03",
+        returnTime: null,
+        status: "requested",
+      });
+      const nullTimeSecond = await makeRequest({
+        requestorUserId: requestor.id,
+        departureDate: "2026-11-03",
+        departureTime: null,
+        returnDate: "2026-11-03",
+        returnTime: null,
+        status: "requested",
+      });
+
+      const response = await getSchedule(token, { weekStart: WEEK });
+      expect(response.status).toBe(200);
+      expect(response.body.items.map((row) => row.id)).toEqual([
+        nullTimeFirst.id,
+        nullTimeSecond.id,
+        timedEarlier.id,
+        timedLater.id,
+      ]);
+    });
   });
 
   describe("US-11.2 — View the service queue", () => {
@@ -326,6 +426,45 @@ describe("Feature 11 — Weekly Vehicle Schedule", () => {
       expect(response.body.weekEnd).toBe(WEEK_END);
     });
 
+    it("Default weekStart stays on the campus Monday after Sunday evening", async () => {
+      // Sunday 2026-11-08 19:00 America/Chicago is Monday 01:00 UTC — UTC mondayOf would jump weeks.
+      jest.useFakeTimers({ advanceTimers: true });
+      jest.setSystemTime(new Date("2026-11-09T01:00:00.000Z"));
+      const { token } = await signInAs("admin");
+      const response = await getSchedule(token);
+      jest.useRealTimers();
+      expect(response.status).toBe(200);
+      expect(response.body.weekStart).toBe(WEEK);
+      expect(response.body.weekEnd).toBe(WEEK_END);
+    });
+
+    it("Need check-in uses America/Chicago return times", async () => {
+      const { user: requestor } = await signInAs("requestor");
+      jest.useFakeTimers({ advanceTimers: true });
+      // 2026-11-03 is CST (UTC-6; DST ended Nov 1). 16:30 Chicago = 22:30 UTC — before a 17:00 return.
+      jest.setSystemTime(new Date("2026-11-03T22:30:00.000Z"));
+      const { token } = await signInAs("admin");
+      const sameDay = await makeRequest({
+        requestorUserId: requestor.id,
+        status: "reserved",
+        departureDate: "2026-11-03",
+        departureTime: "08:00",
+        returnDate: "2026-11-03",
+        returnTime: "17:00",
+      });
+
+      const beforeReturn = await getQueue(token);
+      expect(beforeReturn.status).toBe(200);
+      expect(beforeReturn.body.needCheckIn.map((row) => row.id)).not.toContain(sameDay.id);
+
+      // 17:30 Chicago = 23:30 UTC — after the campus return time.
+      jest.setSystemTime(new Date("2026-11-03T23:30:00.000Z"));
+      const afterReturn = await getQueue(token);
+      jest.useRealTimers();
+      expect(afterReturn.status).toBe(200);
+      expect(afterReturn.body.needCheckIn.map((row) => row.id)).toContain(sameDay.id);
+    });
+
     it("Non-Monday weekStart is rejected", async () => {
       const { token } = await signInAs("admin");
       const response = await getSchedule(token, { weekStart: "2026-11-03" });
@@ -349,6 +488,18 @@ describe("Feature 11 — Weekly Vehicle Schedule", () => {
       const response = await getSchedule(token, { weekStart: WEEK, areaId: 9999 });
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ message: "Area with id=9999 not found." });
+    });
+
+    it("Malformed areaId is rejected", async () => {
+      const { token } = await signInAs("admin");
+      for (const areaId of ["abc", "0", "-1", "1.5", "12abc"]) {
+        const schedule = await getSchedule(token, { weekStart: WEEK, areaId });
+        expect(schedule.status).toBe(400);
+        expect(schedule.body).toEqual({ message: "Area id must be a positive integer." });
+        const queue = await getQueue(token, { areaId });
+        expect(queue.status).toBe(400);
+        expect(queue.body).toEqual({ message: "Area id must be a positive integer." });
+      }
     });
 
     it("Area admin ignores a forged areaId query", async () => {
@@ -384,6 +535,23 @@ describe("Feature 11 — Weekly Vehicle Schedule", () => {
       const response = await getQueue(token);
       expect(response.status).toBe(403);
       expect(response.body).toEqual({ message: "Forbidden." });
+    });
+
+    it("Schedule and queue storage failures return a safe error", async () => {
+      const { token } = await signInAs("admin");
+      const scheduleSpy = jest.spyOn(db.reservationRequest, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost"));
+      const schedule = await getSchedule(token, { weekStart: WEEK });
+      scheduleSpy.mockRestore();
+      expect(schedule.status).toBe(500);
+      expect(schedule.body).toEqual({ message: "Schedule request failed." });
+      expect(JSON.stringify(schedule.body)).not.toMatch(/SQLSTATE|connection lost/i);
+
+      const queueSpy = jest.spyOn(db.reservationRequest, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost"));
+      const queue = await getQueue(token);
+      queueSpy.mockRestore();
+      expect(queue.status).toBe(500);
+      expect(queue.body).toEqual({ message: "Service queue request failed." });
+      expect(JSON.stringify(queue.body)).not.toMatch(/SQLSTATE|connection lost/i);
     });
   });
 });

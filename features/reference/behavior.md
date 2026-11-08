@@ -230,8 +230,8 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 
 | Rule | Enforcement | Introduced |
 |------|-------------|------------|
-| Schedule week is Monday–Sunday; overlap uses departure/return with null times as whole-day bounds; cancelled requests excluded; sort by departureDate, departureTime (nulls first), id | `schedule.controller.js`, `weekRange.js` | Feature 11 |
-| Service queue: `needVehicle` = `awaiting_vehicle`; `needCheckIn` = `reserved` with effective return before now; requested/returned/cancelled never appear | `schedule.controller.js` `serviceQueue` | Feature 11 |
+| Schedule week is Monday–Sunday America/Chicago; overlap uses campus wall-clock departure/return with null times as whole-day bounds; cancelled requests excluded; sort by departureDate, departureTime (nulls first), id | `schedule.controller.js`, `weekRange.js` | Feature 11 |
+| Service queue: `needVehicle` = `awaiting_vehicle`; `needCheckIn` = `reserved` with effective America/Chicago return before now; requested/returned/cancelled never appear | `schedule.controller.js` `serviceQueue` | Feature 11 |
 | Admin sees all areas and may filter by `areaId`; area_admin own area only (null → empty); forged areaId ignored for area_admin | `resolveAreaScope()` | Feature 11 |
 | Requestor and maintenance receive 403 on schedule and queue APIs | `schedule.routes.js` `requireRole("admin", "area_admin")` | Feature 11 |
 

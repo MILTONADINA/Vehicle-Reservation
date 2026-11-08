@@ -111,7 +111,9 @@ describe("Feature 11 — Schedule page", () => {
       expect(wrapper.text()).toContain("reserved");
       expect(wrapper.text()).toContain("2026-11-03 09:00");
       expect(wrapper.text()).toContain("Ford Transit · OC-4521");
-      expect(wrapper.text()).toContain("No vehicle");
+      const vehicles = wrapper.findAll('[data-testid="schedule-vehicle"]');
+      expect(vehicles.some((node) => node.text() === "No vehicle")).toBe(true);
+      expect(vehicles.some((node) => node.text().includes("Ford Transit"))).toBe(true);
       wrapper.unmount();
       mounted.pop();
 
@@ -124,17 +126,24 @@ describe("Feature 11 — Schedule page", () => {
       Utils.setStore("user", { ...account("admin"), token: "session-token" });
       AuthServices.me.mockResolvedValue({ data: account("admin") });
       AreaServices.getAll.mockResolvedValue({ data: [] });
-      ScheduleServices.getServiceQueue.mockResolvedValue({ data: { needVehicle: [], needCheckIn: [] } });
       let resolveSchedule;
+      let resolveQueue;
       ScheduleServices.getSchedule.mockReturnValue(new Promise((resolve) => { resolveSchedule = resolve; }));
+      ScheduleServices.getServiceQueue.mockReturnValue(new Promise((resolve) => { resolveQueue = resolve; }));
       const wrapper = await mountApp("/schedule");
       expect(wrapper.find('[data-testid="schedule-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="queue-loading"]').exists()).toBe(true);
       expect(wrapper.text()).not.toContain("No reservations this week.");
+      expect(wrapper.text()).not.toContain("No requests need a vehicle.");
+      expect(wrapper.text()).not.toContain("No requests need check-in.");
 
       resolveSchedule({ data: { weekStart: "2026-11-02", weekEnd: "2026-11-08", items: [] } });
+      resolveQueue({ data: { needVehicle: [], needCheckIn: [] } });
       await flushPromises();
       expect(wrapper.find('[data-testid="schedule-loading"]').exists()).toBe(false);
       expect(wrapper.text()).toContain("No reservations this week.");
+      expect(wrapper.text()).toContain("No requests need a vehicle.");
+      expect(wrapper.text()).toContain("No requests need check-in.");
     });
 
     it("Schedule failure does not show an empty week", async () => {
@@ -205,6 +214,31 @@ describe("Feature 11 — Schedule page", () => {
       await wrapper.find('[data-testid="previous-week"]').trigger("click");
       await flushPromises();
       expect(ScheduleServices.getSchedule).toHaveBeenCalledWith({ weekStart: "2026-11-02" });
+    });
+
+    it("Admin area filter is sent with schedule and queue requests", async () => {
+      const wrapper = await openSchedule("admin");
+      expect(wrapper.find('[data-testid="schedule-area-filter"]').exists()).toBe(true);
+      ScheduleServices.getSchedule.mockClear();
+      ScheduleServices.getServiceQueue.mockClear();
+      ScheduleServices.getSchedule.mockResolvedValue({
+        data: { weekStart: "2026-11-02", weekEnd: "2026-11-08", items: [] },
+      });
+      ScheduleServices.getServiceQueue.mockResolvedValue({ data: { needVehicle: [], needCheckIn: [] } });
+
+      const field = wrapper.find('[data-testid="schedule-area-filter"]');
+      let instance = field.element.__vueParentComponent;
+      while (instance) {
+        const props = instance.props || {};
+        if ("modelValue" in props && Array.isArray(props.items)) {
+          instance.emit("update:modelValue", 1);
+          break;
+        }
+        instance = instance.parent;
+      }
+      await flushPromises();
+      expect(ScheduleServices.getSchedule).toHaveBeenCalledWith({ weekStart: "2026-11-02", areaId: 1 });
+      expect(ScheduleServices.getServiceQueue).toHaveBeenCalledWith({ areaId: 1 });
     });
   });
 

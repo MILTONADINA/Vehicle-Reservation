@@ -102,6 +102,9 @@ controller.schedule = async (req, res) => {
       where: {
         ...scope.where,
         status: { [db.Sequelize.Op.ne]: "cancelled" },
+        // Coarse calendar filter; exact overlap (including times) is applied below.
+        departureDate: { [db.Sequelize.Op.lte]: weekEnd },
+        returnDate: { [db.Sequelize.Op.gte]: weekStart },
       },
       include: includeRequestorVehicle,
     });
