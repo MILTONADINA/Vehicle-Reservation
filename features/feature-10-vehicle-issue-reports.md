@@ -2,7 +2,7 @@
 
 **Feature ID:** 10  
 **Branch pattern:** `feature/10-vehicle-issue-reports`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-27  
 **Input:** Let a requestor report Low gas, Dirty, or Maintenance need on a reservation request before, during, or after the trip, and let admin, area admin, and maintenance view the issue lists they are allowed to see.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests](feature-7-reservation-requests.md), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
@@ -218,8 +218,8 @@ This feature does not add columns to `vehicles` or change reservation request st
 * **Then** the response is 400 with message Invalid issue data. and no issue is stored
 
 #### Scenario: Client cannot choose vehicle id or reporter
-* **Given** the requestor owns reservation request id 10 with vehicleId 3
-* **When** an issue is posted with body vehicleId 99 and reportedByUserId 1
+* **Given** the requestor owns reservation request id 10 with vehicleId 3 and another user exists
+* **When** an issue is posted with body vehicleId of a different vehicle and reportedByUserId of that other user
 * **Then** the saved issue uses vehicleId 3 and the signed-in user’s id
 
 #### Scenario: Report issue opens the specified form
@@ -231,6 +231,11 @@ This feature does not add columns to `vehicles` or change reservation request st
 * **Given** valid issue fields are entered and POST succeeds
 * **When** the user selects Save
 * **Then** the dialog shows progress while pending, closes on success, and the Issues section shows the new report
+
+#### Scenario: Saving an issue blocks duplicate submits
+* **Given** valid issue fields are entered and Save is pressed while the create request is still pending
+* **When** the user presses Save again
+* **Then** only one create request is sent and Save stays disabled until the first request finishes
 
 #### Scenario: Failed issue save keeps the dialog open
 * **Given** Save is pressed and the API returns an error message or no message
@@ -269,6 +274,16 @@ This feature does not add columns to `vehicles` or change reservation request st
 * **When** GET /vehicle-t6/issues is sent
 * **Then** the response is 403 with the Feature 1 Forbidden. message
 
+#### Scenario: Listing issues on another users request is rejected
+* **Given** reservation request id 11 belongs to a different requestor and has issues
+* **When** the signed-in requestor lists issues for request 11
+* **Then** the response is 404 with message Reservation request with id=11 not found.
+
+#### Scenario: Area admin cannot list issues for another areas request
+* **Given** an area_admin has areaId 2 and reservation request id 9 has areaId 1 with issues
+* **When** that user lists issues for request 9
+* **Then** the response is 404 with message Reservation request with id=9 not found.
+
 #### Scenario: Issues page shows allowed rows
 * **Given** GET /issues returns the caller’s allowed issues
 * **When** an admin, area_admin, or maintenance user opens /issues from MenuBar
@@ -301,6 +316,11 @@ This feature does not add columns to `vehicles` or change reservation request st
 * **When** that user posts an issue to request 10
 * **Then** the response is 403 with the Feature 1 Forbidden. message and no issue is stored
 
+#### Scenario: Maintenance cannot list issues for one request
+* **Given** a maintenance user is signed in and reservation request id 10 exists
+* **When** that user lists issues for request 10
+* **Then** the response is 403 with the Feature 1 Forbidden. message
+
 #### Scenario: Invalid reservation request route id is rejected for issues
 * **Given** an admin is signed in
 * **When** an issue route is called with request id abc, 0, -1, or an unsafe integer
@@ -321,6 +341,11 @@ This feature does not add columns to `vehicles` or change reservation request st
 * **When** an admin deletes vehicle 3
 * **Then** the response is 409 with message Vehicle is in use. and both the vehicle and issue remain
 
+#### Scenario: Issue storage failures return a safe error
+* **Given** an authenticated caller with a valid issue create or list action
+* **When** the database operation fails
+* **Then** the response is 500 with message Issue request failed. and no SQL details are returned
+
 ## Test Coverage Map
 
 Exact `it(...)` titles. Backend file: `backend/tests/issues.test.js`. Frontend files: `frontend/tests/RequestIssues.test.js` and `frontend/tests/Issues.test.js`.
@@ -338,6 +363,7 @@ Exact `it(...)` titles. Backend file: `backend/tests/issues.test.js`. Frontend f
 | US-10.1 | Client cannot choose vehicle id or reporter | `backend/tests/issues.test.js` | `it("Client cannot choose vehicle id or reporter")` |
 | US-10.1 | Report issue opens the specified form | `frontend/tests/RequestIssues.test.js` | `it("Report issue opens the specified form")` |
 | US-10.1 | Saving an issue refreshes the list | `frontend/tests/RequestIssues.test.js` | `it("Saving an issue refreshes the list")` |
+| US-10.1 | Saving an issue blocks duplicate submits | `frontend/tests/RequestIssues.test.js` | `it("Saving an issue blocks duplicate submits")` |
 | US-10.1 | Failed issue save keeps the dialog open | `frontend/tests/RequestIssues.test.js` | `it("Failed issue save keeps the dialog open")` |
 | US-10.2 | Requestor lists issues on their request | `backend/tests/issues.test.js` | `it("Requestor lists issues on their request")` |
 | US-10.2 | Empty issue list is returned | `backend/tests/issues.test.js` | `it("Empty issue list is returned")` |
@@ -345,16 +371,20 @@ Exact `it(...)` titles. Backend file: `backend/tests/issues.test.js`. Frontend f
 | US-10.2 | Area admin lists only issues for its area | `backend/tests/issues.test.js` | `it("Area admin lists only issues for its area")` |
 | US-10.2 | Maintenance lists only maintenance need issues | `backend/tests/issues.test.js` | `it("Maintenance lists only maintenance need issues")` |
 | US-10.2 | Requestor cannot use the open issues list | `backend/tests/issues.test.js` | `it("Requestor cannot use the open issues list")` |
+| US-10.2 | Listing issues on another users request is rejected | `backend/tests/issues.test.js` | `it("Listing issues on another users request is rejected")` |
+| US-10.2 | Area admin cannot list issues for another areas request | `backend/tests/issues.test.js` | `it("Area admin cannot list issues for another areas request")` |
 | US-10.2 | Issues page shows allowed rows | `frontend/tests/Issues.test.js` | `it("Issues page shows allowed rows")` |
 | US-10.2 | Requestor is sent Home from Issues | `frontend/tests/Issues.test.js` | `it("Requestor is sent Home from Issues")` |
 | US-10.2 | Issues page distinguishes loading empty and failed states | `frontend/tests/Issues.test.js` | `it("Issues page distinguishes loading empty and failed states")` |
 | US-10.2 | Issue list failure does not show an empty list | `frontend/tests/Issues.test.js` | `it("Issue list failure does not show an empty list")` |
 | US-10.3 | Issue APIs require a session | `backend/tests/issues.test.js` | `it("Issue APIs require a session")` |
 | US-10.3 | Maintenance cannot create an issue | `backend/tests/issues.test.js` | `it("Maintenance cannot create an issue")` |
+| US-10.3 | Maintenance cannot list issues for one request | `backend/tests/issues.test.js` | `it("Maintenance cannot list issues for one request")` |
 | US-10.3 | Invalid reservation request route id is rejected for issues | `backend/tests/issues.test.js` | `it("Invalid reservation request route id is rejected for issues")` |
 | US-10.3 | Missing reservation request is rejected for issues | `backend/tests/issues.test.js` | `it("Missing reservation request is rejected for issues")` |
 | US-10.3 | Referenced reporter user cannot be deleted while in use | `backend/tests/issues.test.js` | `it("Referenced reporter user cannot be deleted while in use")` |
 | US-10.3 | Referenced vehicle cannot be deleted while issues exist | `backend/tests/issues.test.js` | `it("Referenced vehicle cannot be deleted while issues exist")` |
+| US-10.3 | Issue storage failures return a safe error | `backend/tests/issues.test.js` | `it("Issue storage failures return a safe error")` |
 
 ## Agent implementation request
 
@@ -374,15 +404,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-014** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 10 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-014** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 10 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 

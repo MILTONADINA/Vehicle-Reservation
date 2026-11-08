@@ -163,6 +163,9 @@ controller.remove = async (req, res) => {
     });
     return send(res, outcome);
   } catch (error) {
+    if (error instanceof db.Sequelize.ForeignKeyConstraintError) {
+      return send(res, reply(409, { message: "User is in use." }));
+    }
     return failed(res, "delete", error);
   }
 };

@@ -206,3 +206,23 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Email logs carry only fixed codes, job ids, states, attempts, and counts; never recipients, bodies, credentials, or provider errors | `emailCycle.js`, `emailSchedule.js`, `reservationEmail.controller.js` | Feature 9 |
 | Only admin may POST `/reservation-emails/send-now`; body and query are ignored | `reservationEmail.routes.js` `requireRole("admin")` | Feature 9 |
 
+## Issue reports
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Issue reports store `requestId`, `issueType` (`low_gas`/`dirty`/`maintenance_need`), `timing` (`before`/`during`/`after`), optional trimmed `note` (≤ 1000; blank → null), `reportedByUserId` (signed-in user), optional `vehicleId` copied from the request, and server `createdAt` | `issue.controller.js` `createForRequest` | Feature 10 |
+| Create and per-request list: admin any request; area_admin own-area only (null areaId → 404); requestor own request only; out-of-scope → same 404 as missing; maintenance → 403 | `findScopedRequest()`, `reservationRequest.routes.js` `requireRole` | Feature 10 |
+| Open list GET `/issues`: admin all; area_admin own-area requests (null areaId → `[]`); maintenance `maintenance_need` only; requestor → 403 | `issue.controller.js` `listOpen` | Feature 10 |
+| Client cannot set `vehicleId` or `reportedByUserId` on create; invalid type/timing/note or bad route id → 400 without write | `validateCreateBody()`, `parseRequestId()` | Feature 10 |
+| Reporting does not change reservation request status; any request status may receive an issue | Feature 10 assumptions | Feature 10 |
+| Deleting a reporter user or a vehicle still referenced by an issue returns 409 (`User is in use.` / `Vehicle is in use.`) | `user.controller.js` remove, `vehicle.controller.js` remove, `models/index.js` associations | Feature 10 |
+
+## Issues screens
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Request list gains **Issues** per allowed row; selecting it shows that request's reports (type, timing, note, reporter when available, created time) and **Report issue** for requestor (own), admin, and in-scope area_admin; maintenance has no Report issue here | `ReservationRequests.vue` `openRequestIssues()`, `issueDialog` | Feature 10 |
+| Report issue dialog: Issue type, When, optional Note, Save, Cancel; progress and duplicate-block on Save; success closes and refreshes; failure keeps values with API message or `Issue could not be saved.` | `ReservationRequests.vue` `saveIssue()` | Feature 10 |
+| MenuBar **Issues** (`/issues`, heading **Issues**) for admin, area_admin, and maintenance; requestor is sent Home and has no menu link; signed-out visitors go to Login | `router.js`, `MenuBar.vue`, `Issues.vue` | Feature 10 |
+| Issues page lists allowed open issues (request id, type, timing, vehicle id when present, created); progress while loading; `No issues found.` only after successful empty list; failure shows API message or `Issues could not be loaded.` | `Issues.vue` `load()` | Feature 10 |
+

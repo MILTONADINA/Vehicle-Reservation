@@ -195,6 +195,25 @@ Send now runs the same cycle as the every-minute schedule: prepare eligible day-
 | area_admin, requestor, or maintenance | 403 | `Forbidden.` |
 | Invalid SMTP configuration or an unexpected run failure | 500 | `Emails could not be processed.` |
 
+## Issue Reports
+
+| Method | Endpoint | Allowed role | Success |
+|--------|----------|--------------|---------|
+| POST | `/vehicle-t6/reservation-requests/:requestId/issues` | admin; area_admin for own-area request; requestor for own request | `201`, new Issue object |
+| GET | `/vehicle-t6/reservation-requests/:requestId/issues` | admin; area_admin for own-area request; requestor for own request | `200`, array of Issue objects sorted by `createdAt`, then `id` |
+| GET | `/vehicle-t6/issues` | admin (all); area_admin (own-area requests); maintenance (`maintenance_need` only) | `200`, array of Issue objects sorted by `createdAt`, then `id` |
+
+POST body: `{ "issueType": "low_gas", "timing": "after", "note": "Tank was near empty on return." }`. `issueType` is `low_gas`, `dirty`, or `maintenance_need`. `timing` is `before`, `during`, or `after`. `note` is optional; when present it is trimmed to at most 1,000 characters (blank becomes null). Other body properties, including `vehicleId` and `reportedByUserId`, are ignored. Issue object: `{ "id", "requestId", "vehicleId", "issueType", "timing", "note", "reportedByUserId", "createdAt" }`. `vehicleId` is copied from the request at create time and may be null. `createdAt` is server-generated. Empty per-request and open lists return `200` with `[]`. Requestor receives 403 on the open list. Maintenance receives 403 on per-request create and list.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Invalid issueType, timing, or note | 400 | `Invalid issue data.` |
+| Non-positive or non-integer `:requestId` | 400 | `Reservation request id must be a positive integer.` |
+| Missing or out-of-scope request (including another requestor's request, or another area for area_admin) | 404 | `Reservation request with id=<id> not found.` |
+| Delete of a user who reported an issue | 409 | `User is in use.` |
+| Delete of a vehicle that still has issue reports | 409 | `Vehicle is in use.` |
+| Other database failure on issues | 500 | `Issue request failed.` |
+
 ## Provenance
 
 | Area | Introduced |
@@ -208,3 +227,4 @@ Send now runs the same cycle as the every-minute schedule: prepare eligible day-
 | Reservation requests list, create, update, cancel | Feature 7 |
 | Reservation request candidate-vehicles, status change | Feature 8 |
 | Reservation emails send-now; status-email job on status change and cancel | Feature 9 |
+| Issue reports create and list (per-request and open) | Feature 10 |
