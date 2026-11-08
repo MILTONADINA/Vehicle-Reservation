@@ -16,6 +16,7 @@ onBeforeUnmount(() => window.removeEventListener("user-logged-in", refreshUser))
 const canManageUsers = computed(() => ["admin", "area_admin"].includes(user.value?.role));
 const canSeeRequests = computed(() => ["requestor", "admin", "area_admin"].includes(user.value?.role));
 const canSeeIssues = computed(() => ["admin", "area_admin", "maintenance"].includes(user.value?.role));
+const canSeeSchedule = computed(() => ["admin", "area_admin"].includes(user.value?.role));
 
 // Ends the server session, then forgets the local one. An already-invalid session (401)
 // is treated as signed out; any other failure keeps the session so the user can retry.
@@ -45,6 +46,7 @@ async function signOut() {
     <v-btn v-if="canManageUsers" :to="{ name: 'destinations' }" variant="text" data-testid="nav-destinations">Destinations</v-btn>
     <v-btn v-if="canSeeRequests" :to="{ name: 'reservation-requests' }" variant="text" data-testid="nav-requests">Requests</v-btn>
     <v-btn v-if="canSeeIssues" :to="{ name: 'issues' }" variant="text" data-testid="nav-issues">Issues</v-btn>
+    <v-btn v-if="canSeeSchedule" :to="{ name: 'schedule' }" variant="text" data-testid="nav-schedule">Schedule</v-btn>
     <span class="mx-4" data-testid="signed-in-email">{{ user?.email }}</span>
     <v-btn data-testid="sign-out" variant="text" @click="signOut">Sign out</v-btn>
   </v-app-bar>

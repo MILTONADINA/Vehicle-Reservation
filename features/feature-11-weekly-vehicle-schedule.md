@@ -2,7 +2,7 @@
 
 **Feature ID:** 11  
 **Branch pattern:** `feature/11-weekly-vehicle-schedule`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-28  
 **Input:** Give admins and area admins a weekly calendar of reservation requests with status and vehicle, plus a service queue of requests that still need a vehicle or need check-in after the trip.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests](feature-7-reservation-requests.md), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
@@ -371,15 +371,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-014** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 11 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-014** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 11 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 

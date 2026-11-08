@@ -214,6 +214,23 @@ POST body: `{ "issueType": "low_gas", "timing": "after", "note": "Tank was near 
 | Delete of a vehicle that still has issue reports | 409 | `Vehicle is in use.` |
 | Other database failure on issues | 500 | `Issue request failed.` |
 
+## Weekly Schedule & Service Queue
+
+| Method | Endpoint | Allowed role | Success |
+|--------|----------|--------------|---------|
+| GET | `/vehicle-t6/schedule` | admin, area_admin | `200`, `{ "weekStart", "weekEnd", "items": [ ScheduleItem, ... ] }` |
+| GET | `/vehicle-t6/service-queue` | admin, area_admin | `200`, `{ "needVehicle": [ ScheduleItem, ... ], "needCheckIn": [ ScheduleItem, ... ] }` |
+
+Schedule query: optional `weekStart` (Monday `YYYY-MM-DD`; defaults to the Monday of the current server UTC date); optional `areaId` (admin only). Queue query: optional `areaId` (admin only). Area_admin callers ignore a forged `areaId` and keep their own area; null areaId yields empty results. Cancelled requests are omitted from the schedule. `needVehicle` is `awaiting_vehicle` only. `needCheckIn` is `reserved` with effective return earlier than now. ScheduleItem: `{ "id", "areaId", "status", "departureDate", "departureTime", "returnDate", "returnTime", "requestorUserId", "requestorName", "vehicleId", "vehicleLabel" }`. Times and vehicle fields may be null. `vehicleLabel` is `make model · plateNumber` when assigned. Items sort by departureDate, departureTime (nulls first), then id.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Invalid or non-Monday `weekStart` | 400 | `Invalid schedule data.` |
+| Invalid `areaId` shape | 400 | `Area id must be a positive integer.` |
+| Admin `areaId` that does not exist | 404 | `Area with id=<id> not found.` |
+| Schedule database failure | 500 | `Schedule request failed.` |
+| Service queue database failure | 500 | `Service queue request failed.` |
+
 ## Provenance
 
 | Area | Introduced |
@@ -228,3 +245,4 @@ POST body: `{ "issueType": "low_gas", "timing": "after", "note": "Tank was near 
 | Reservation request candidate-vehicles, status change | Feature 8 |
 | Reservation emails send-now; status-email job on status change and cancel | Feature 9 |
 | Issue reports create and list (per-request and open) | Feature 10 |
+| Weekly schedule and service queue | Feature 11 |

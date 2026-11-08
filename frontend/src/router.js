@@ -8,6 +8,7 @@ import Drivers from "./views/Drivers.vue";
 import Destinations from "./views/Destinations.vue";
 import ReservationRequests from "./views/ReservationRequests.vue";
 import Issues from "./views/Issues.vue";
+import Schedule from "./views/Schedule.vue";
 import Utils from "./config/utils.js";
 
 export function createAppRouter() {
@@ -66,6 +67,12 @@ export function createAppRouter() {
         name: "issues",
         component: Issues,
         meta: { requiresAuth: true, roles: ["admin", "area_admin", "maintenance"] },
+      },
+      {
+        path: "/schedule",
+        name: "schedule",
+        component: Schedule,
+        meta: { requiresAuth: true, roles: ["admin", "area_admin"] },
       },
       {
         path: "/:pathMatch(.*)*",
