@@ -243,3 +243,21 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | This week shows week range, Previous/Next week, optional admin Area filter, and schedule rows (status, times, vehicle label or `No vehicle`) | `Schedule.vue` | Feature 11 |
 | Service queue shows Need vehicle and Need check-in; empty texts only after success; failures use API message or schedule/queue fallbacks | `Schedule.vue` `loadSchedule()`, `loadQueue()` | Feature 11 |
 
+## Mileage & service logs
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Admin and maintenance list every vehicle for logging and create/list mileage and service logs for any vehicle; requestor and area_admin receive 403 | `maintenanceLog.routes.js` `requireRole("admin", "maintenance")` | Feature 12 |
+| New mileage must be ≥ latest reading for that vehicle (latest by logDate, then id); lower readings return 409 without saving | `maintenanceLog.controller.js` `createMileage` | Feature 12 |
+| Service type is `repair`, `oil_change`, or `tire_replacement`; blank note stored as null; `loggedByUserId` always from the session | `maintenanceLog.controller.js` | Feature 12 |
+| Deleting a vehicle with mileage/service logs or a user who logged them returns 409 `Vehicle is in use.` / `User is in use.` | FK `RESTRICT` on `mileageLogs` / `serviceLogs` | Feature 12 |
+
+## Maintenance screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| MenuBar **Maintenance** (`/maintenance`, heading **Maintenance**) for admin and maintenance only; requestor/area_admin sent Home; signed-out → Login | `router.js`, `MenuBar.vue` | Feature 12 |
+| Vehicle list shows make, model, year, plate, color; choosing a row opens `/maintenance/vehicles/:vehicleId` with mileage and services sections | `Maintenance.vue`, `MaintenanceVehicle.vue` | Feature 12 |
+| Add mileage / Add service dialogs validate before submit, show progress, block duplicate saves, close and refresh on success, keep values with API message or fallback on failure | `MaintenanceVehicle.vue` | Feature 12 |
+| Empty texts (`No vehicles found.`, `No mileage logs found.`, `No service logs found.`) only after successful empty loads; failures use API message or Vehicles/Mileage/Service logs fallbacks | `Maintenance.vue`, `MaintenanceVehicle.vue` | Feature 12 |
+

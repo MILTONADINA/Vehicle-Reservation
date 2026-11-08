@@ -2,7 +2,7 @@
 
 **Feature ID:** 12  
 **Branch pattern:** `feature/12-mileage-service-logs`  
-**Status:** Ready  
+**Status:** Implemented  
 **Created:** 2026-10-28  
 **Input:** Let maintenance staff (and admins) see the vehicle list, log mileage with a date and odometer reading, and log services such as repair, oil change, or tire replacement.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md)
@@ -464,15 +464,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-016** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 12 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-016** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 12 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 

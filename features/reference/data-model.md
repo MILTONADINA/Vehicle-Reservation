@@ -143,6 +143,33 @@ Sequelize table `issueReports`.
 | reportedByUserId | Integer | Required foreign key to `users.id`, `ON DELETE RESTRICT`; always the signed-in user |
 | createdAt, updatedAt | DateTime | Sequelize timestamps; API returns `createdAt` |
 
+### `mileage_logs`
+
+Sequelize table `mileageLogs`.
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| vehicleId | Integer | Required foreign key to `vehicles.id`, `ON DELETE RESTRICT` |
+| logDate | Date only | Required; `YYYY-MM-DD` |
+| mileage | Integer | Required; 0 through 2,000,000 |
+| loggedByUserId | Integer | Required foreign key to `users.id`, `ON DELETE RESTRICT`; always the signed-in user |
+| createdAt, updatedAt | DateTime | Sequelize timestamps; API returns `createdAt` |
+
+### `service_logs`
+
+Sequelize table `serviceLogs`.
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | Integer | Auto-generated primary key |
+| vehicleId | Integer | Required foreign key to `vehicles.id`, `ON DELETE RESTRICT` |
+| serviceDate | Date only | Required; `YYYY-MM-DD` |
+| serviceType | Enum | `repair`, `oil_change`, or `tire_replacement` |
+| note | String(1000), nullable | Optional; trimmed; blank becomes null; case and internal spaces kept |
+| loggedByUserId | Integer | Required foreign key to `users.id`, `ON DELETE RESTRICT`; always the signed-in user |
+| createdAt, updatedAt | DateTime | Sequelize timestamps; API returns `createdAt` |
+
 ## Associations
 
 | Association | Options | Introduced |
@@ -159,6 +186,10 @@ Sequelize table `issueReports`.
 | `reservationRequest.hasMany(issueReport, { as: "issues" })` / `issueReport.belongsTo(reservationRequest, { as: "reservationRequest" })` | `foreignKey: requestId` (not null), `onDelete: RESTRICT` | Feature 10 |
 | `vehicle.hasMany(issueReport, { as: "issueReports" })` / `issueReport.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (nullable), `onDelete: RESTRICT` — deleting a vehicle with issues returns 409 `Vehicle is in use.` | Feature 10 |
 | `user.hasMany(issueReport, { as: "issueReports" })` / `issueReport.belongsTo(user, { as: "reporter" })` | `foreignKey: reportedByUserId` (not null), `onDelete: RESTRICT` — deleting a reporter returns 409 `User is in use.` | Feature 10 |
+| `vehicle.hasMany(mileageLog, { as: "mileageLogs" })` / `mileageLog.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (not null), `onDelete: RESTRICT` — deleting a vehicle with mileage logs returns 409 `Vehicle is in use.` | Feature 12 |
+| `user.hasMany(mileageLog, { as: "mileageLogs" })` / `mileageLog.belongsTo(user, { as: "logger" })` | `foreignKey: loggedByUserId` (not null), `onDelete: RESTRICT` — deleting a logger returns 409 `User is in use.` | Feature 12 |
+| `vehicle.hasMany(serviceLog, { as: "serviceLogs" })` / `serviceLog.belongsTo(vehicle, { as: "vehicle" })` | `foreignKey: vehicleId` (not null), `onDelete: RESTRICT` — deleting a vehicle with service logs returns 409 `Vehicle is in use.` | Feature 12 |
+| `user.hasMany(serviceLog, { as: "serviceLogs" })` / `serviceLog.belongsTo(user, { as: "logger" })` | `foreignKey: loggedByUserId` (not null), `onDelete: RESTRICT` — deleting a logger returns 409 `User is in use.` | Feature 12 |
 
 Drivers have no foreign keys to users, areas, or vehicles. Destinations have no foreign keys to users, areas, vehicles, or drivers.
 
@@ -175,3 +206,4 @@ Drivers have no foreign keys to users, areas, or vehicles. Destinations have no 
 | reservation_requests.vehicleId, reservation_requests.statusReason, vehicle association | Feature 8 |
 | reservation_emails | Feature 9 |
 | issue_reports | Feature 10 |
+| mileage_logs, service_logs | Feature 12 |

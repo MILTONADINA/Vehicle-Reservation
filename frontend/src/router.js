@@ -9,6 +9,8 @@ import Destinations from "./views/Destinations.vue";
 import ReservationRequests from "./views/ReservationRequests.vue";
 import Issues from "./views/Issues.vue";
 import Schedule from "./views/Schedule.vue";
+import Maintenance from "./views/Maintenance.vue";
+import MaintenanceVehicle from "./views/MaintenanceVehicle.vue";
 import Utils from "./config/utils.js";
 
 export function createAppRouter() {
@@ -73,6 +75,18 @@ export function createAppRouter() {
         name: "schedule",
         component: Schedule,
         meta: { requiresAuth: true, roles: ["admin", "area_admin"] },
+      },
+      {
+        path: "/maintenance",
+        name: "maintenance",
+        component: Maintenance,
+        meta: { requiresAuth: true, roles: ["admin", "maintenance"] },
+      },
+      {
+        path: "/maintenance/vehicles/:vehicleId",
+        name: "maintenance-vehicle",
+        component: MaintenanceVehicle,
+        meta: { requiresAuth: true, roles: ["admin", "maintenance"] },
       },
       {
         path: "/:pathMatch(.*)*",
