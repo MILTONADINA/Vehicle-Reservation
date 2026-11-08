@@ -226,3 +226,20 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | MenuBar **Issues** (`/issues`, heading **Issues**) for admin, area_admin, and maintenance; requestor is sent Home and has no menu link; signed-out visitors go to Login | `router.js`, `MenuBar.vue`, `Issues.vue` | Feature 10 |
 | Issues page lists allowed open issues (request id, type, timing, vehicle id when present, created); progress while loading; `No issues found.` only after successful empty list; failure shows API message or `Issues could not be loaded.` | `Issues.vue` `load()` | Feature 10 |
 
+## Weekly schedule & service queue
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| Schedule week is Monday–Sunday America/Chicago; overlap uses campus wall-clock departure/return with null times as whole-day bounds; cancelled requests excluded; sort by departureDate, departureTime (nulls first), id | `schedule.controller.js`, `weekRange.js` | Feature 11 |
+| Service queue: `needVehicle` = `awaiting_vehicle`; `needCheckIn` = `reserved` with effective America/Chicago return before now; requested/returned/cancelled never appear | `schedule.controller.js` `serviceQueue` | Feature 11 |
+| Admin sees all areas and may filter by `areaId`; area_admin own area only (null → empty); forged areaId ignored for area_admin | `resolveAreaScope()` | Feature 11 |
+| Requestor and maintenance receive 403 on schedule and queue APIs | `schedule.routes.js` `requireRole("admin", "area_admin")` | Feature 11 |
+
+## Schedule screen
+
+| Rule | Enforcement | Introduced |
+|------|-------------|------------|
+| MenuBar **Schedule** (`/schedule`, heading **Schedule**) for admin and area_admin only; requestor/maintenance sent Home; signed-out → Login | `router.js`, `MenuBar.vue` | Feature 11 |
+| This week shows week range, Previous/Next week, optional admin Area filter, and schedule rows (status, times, vehicle label or `No vehicle`) | `Schedule.vue` | Feature 11 |
+| Service queue shows Need vehicle and Need check-in; empty texts only after success; failures use API message or schedule/queue fallbacks | `Schedule.vue` `loadSchedule()`, `loadQueue()` | Feature 11 |
+

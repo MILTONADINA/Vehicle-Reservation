@@ -2,7 +2,7 @@
 
 **Feature ID:** 11  
 **Branch pattern:** `feature/11-weekly-vehicle-schedule`  
-**Status:** Ready  
+**Status:** Shipped  
 **Created:** 2026-10-28  
 **Input:** Give admins and area admins a weekly calendar of reservation requests with status and vehicle, plus a service queue of requests that still need a vehicle or need check-in after the trip.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md), [Feature 7 — Reservation Requests](feature-7-reservation-requests.md), [Feature 8 — Request Processing in the catalog](README.md#feature-catalog)
@@ -60,8 +60,8 @@ Every story is P1: each one must ship for the assignment’s weekly schedule and
 * **FR-001:** This feature MUST reuse Feature 1 authentication and roles, Feature 4 vehicle identity when a request has vehicleId, and the reservation request fields and shared statuses from Features 7 and 8. It MUST NOT create requests, assign vehicles, mark Returned, or send email. Mark Returned belongs only to Feature 8’s shared status-change operation.
 * **FR-002:** Schedule and queue reads MUST use the existing reservation request rows. This feature MUST NOT add a new table.
 * **FR-003:** A schedule entry MUST expose request id, areaId, status, departureDate, departureTime, returnDate, returnTime, requestor display name or requestorUserId, vehicleId, and vehicle label when a vehicle is assigned (make, model, and plateNumber from Feature 4). Missing vehicle fields MUST be null. Status values MUST be the Feature 7/8 shared values: `requested`, `awaiting_vehicle`, `reserved`, `returned`, `cancelled`.
-* **FR-004:** GET schedule MUST accept `weekStart` as a `YYYY-MM-DD` date that is a Monday. The week runs Monday 00:00:00 through Sunday 23:59:59.999 in the server’s local date handling for that calendar date. Requests that overlap that range MUST be included except requests whose status is `cancelled`, which MUST be excluded. Overlap uses each request’s departureDate/departureTime and returnDate/returnTime, treating null times as whole-day bounds (00:00 start, 23:59 end) per Feature 7.
-* **FR-005:** Missing weekStart MUST default to the Monday of the current server date. An invalid weekStart or a date that is not a Monday MUST return 400 `Invalid schedule data.`
+* **FR-004:** GET schedule MUST accept `weekStart` as a `YYYY-MM-DD` date that is a Monday. The week runs Monday 00:00:00 through Sunday 23:59:59.999 in America/Chicago for that calendar date. Requests that overlap that range MUST be included except requests whose status is `cancelled`, which MUST be excluded. Overlap uses each request’s departureDate/departureTime and returnDate/returnTime as America/Chicago wall-clock times, treating null times as whole-day bounds (00:00 start, 23:59 end) per Feature 7.
+* **FR-005:** Missing weekStart MUST default to the Monday of the current America/Chicago campus date. An invalid weekStart or a date that is not a Monday MUST return 400 `Invalid schedule data.`
 * **FR-006:** Schedule results MUST sort by departureDate ascending, departureTime ascending with nulls first, then id ascending. An empty week MUST be 200 with [].
 * **FR-007:** The service queue MUST return two arrays in one response: `needVehicle` and `needCheckIn`. `needVehicle` MUST contain requests with status `awaiting_vehicle`. `needCheckIn` MUST contain requests with status `reserved` whose effective return (returnDate with returnTime, or end of returnDate when returnTime is null) is earlier than the server’s current time. Statuses `requested`, `returned`, and `cancelled` MUST NOT appear in either list.
 * **FR-008:** Queue lists MUST sort by departureDate ascending, departureTime ascending with nulls first, then id ascending. Either array MAY be empty. The response MUST still be 200 with both arrays present.
@@ -207,6 +207,16 @@ No new tables. Read reservation requests from Features 7 and 8 and join Feature 
 * **When** an admin requests the schedule
 * **Then** that item includes vehicleId and vehicleLabel containing Ford Transit and OC-4521
 
+#### Scenario: Week overlap includes Monday start and Sunday end bounds
+* **Given** requests that end at Monday 00:00, start at Sunday 23:59, fill Monday as a whole day, end before the week, or start after the week
+* **When** an admin requests the schedule for weekStart 2026-11-02
+* **Then** only the overlapping requests are included
+
+#### Scenario: Schedule items sort by date null times then id
+* **Given** several overlapping requests share a departure date with null and timed departures
+* **When** an admin requests that schedule
+* **Then** items sort by departureDate, null departureTime first, then timed departureTime, then id
+
 #### Scenario: Schedule page shows the week items
 * **Given** GET /schedule returns items for the current week
 * **When** an admin or area_admin opens /schedule from MenuBar
@@ -266,10 +276,25 @@ No new tables. Read reservation requests from Features 7 and 8 and join Feature 
 * **When** an admin requests GET /vehicle-t6/schedule with no weekStart
 * **Then** the response uses weekStart 2026-11-02
 
+#### Scenario: Default weekStart stays on the campus Monday after Sunday evening
+* **Given** the current America/Chicago instant is Sunday evening in the week of 2026-11-02 while UTC has already reached Monday
+* **When** an admin requests GET /vehicle-t6/schedule with no weekStart
+* **Then** the response still uses weekStart 2026-11-02
+
+#### Scenario: Need check-in uses America/Chicago return times
+* **Given** a reserved request returns at 17:00 America/Chicago on 2026-11-03
+* **When** an admin requests the service queue before and after that campus time
+* **Then** needCheckIn excludes the request before 17:00 Chicago and includes it afterward
+
 #### Scenario: Next and previous week change the range
 * **Given** the Schedule page is showing weekStart 2026-11-02
 * **When** the user selects Next week, then Previous week
 * **Then** the page requests weekStart 2026-11-09 and then weekStart 2026-11-02
+
+#### Scenario: Admin area filter is sent with schedule and queue requests
+* **Given** an admin is on the Schedule page
+* **When** the user selects an Area filter value
+* **Then** schedule and service-queue requests include that areaId
 
 #### Scenario: Non-Monday weekStart is rejected
 * **Given** an admin is signed in
@@ -285,6 +310,11 @@ No new tables. Read reservation requests from Features 7 and 8 and join Feature 
 * **Given** no area has id 9999
 * **When** an admin requests the schedule with areaId 9999
 * **Then** the response is 404 with message Area with id=9999 not found.
+
+#### Scenario: Malformed areaId is rejected
+* **Given** an admin is signed in
+* **When** schedule or service-queue is requested with a non-positive or non-integer areaId
+* **Then** each response is 400 with message Area id must be a positive integer.
 
 #### Scenario: Area admin ignores a forged areaId query
 * **Given** an area_admin has areaId 2
@@ -307,6 +337,11 @@ No new tables. Read reservation requests from Features 7 and 8 and join Feature 
 * **Given** a maintenance user is signed in
 * **When** GET /vehicle-t6/service-queue is sent
 * **Then** the response is 403 with the Feature 1 Forbidden. message
+
+#### Scenario: Schedule and queue storage failures return a safe error
+* **Given** an admin is signed in
+* **When** schedule or service-queue database reads fail
+* **Then** each response is 500 with Schedule request failed. or Service queue request failed. and no SQL details
 
 #### Scenario: Schedule navigation requires an allowed role
 * **Given** a signed-out visitor opens /schedule
@@ -331,6 +366,8 @@ Exact `it(...)` titles. Backend file: `backend/tests/schedule.test.js`. Frontend
 | US-11.1 | Cancelled requests stay off the schedule | `backend/tests/schedule.test.js` | `it("Cancelled requests stay off the schedule")` |
 | US-11.1 | Empty week returns an empty schedule | `backend/tests/schedule.test.js` | `it("Empty week returns an empty schedule")` |
 | US-11.1 | Assigned vehicle label is included | `backend/tests/schedule.test.js` | `it("Assigned vehicle label is included")` |
+| US-11.1 | Week overlap includes Monday start and Sunday end bounds | `backend/tests/schedule.test.js` | `it("Week overlap includes Monday start and Sunday end bounds")` |
+| US-11.1 | Schedule items sort by date null times then id | `backend/tests/schedule.test.js` | `it("Schedule items sort by date null times then id")` |
 | US-11.1 | Schedule page shows the week items | `frontend/tests/Schedule.test.js` | `it("Schedule page shows the week items")` |
 | US-11.1 | Schedule page distinguishes loading empty and failed states | `frontend/tests/Schedule.test.js` | `it("Schedule page distinguishes loading empty and failed states")` |
 | US-11.1 | Schedule failure does not show an empty week | `frontend/tests/Schedule.test.js` | `it("Schedule failure does not show an empty week")` |
@@ -342,14 +379,19 @@ Exact `it(...)` titles. Backend file: `backend/tests/schedule.test.js`. Frontend
 | US-11.2 | Service queue section shows both lists | `frontend/tests/Schedule.test.js` | `it("Service queue section shows both lists")` |
 | US-11.2 | Service queue empty and failed states | `frontend/tests/Schedule.test.js` | `it("Service queue empty and failed states")` |
 | US-11.3 | Default weekStart is the current Monday | `backend/tests/schedule.test.js` | `it("Default weekStart is the current Monday")` |
+| US-11.3 | Default weekStart stays on the campus Monday after Sunday evening | `backend/tests/schedule.test.js` | `it("Default weekStart stays on the campus Monday after Sunday evening")` |
+| US-11.3 | Need check-in uses America/Chicago return times | `backend/tests/schedule.test.js` | `it("Need check-in uses America/Chicago return times")` |
 | US-11.3 | Next and previous week change the range | `frontend/tests/Schedule.test.js` | `it("Next and previous week change the range")` |
+| US-11.3 | Admin area filter is sent with schedule and queue requests | `frontend/tests/Schedule.test.js` | `it("Admin area filter is sent with schedule and queue requests")` |
 | US-11.3 | Non-Monday weekStart is rejected | `backend/tests/schedule.test.js` | `it("Non-Monday weekStart is rejected")` |
 | US-11.3 | Admin may filter schedule by area | `backend/tests/schedule.test.js` | `it("Admin may filter schedule by area")` |
 | US-11.3 | Unknown admin area filter is rejected | `backend/tests/schedule.test.js` | `it("Unknown admin area filter is rejected")` |
+| US-11.3 | Malformed areaId is rejected | `backend/tests/schedule.test.js` | `it("Malformed areaId is rejected")` |
 | US-11.3 | Area admin ignores a forged areaId query | `backend/tests/schedule.test.js` | `it("Area admin ignores a forged areaId query")` |
 | US-11.4 | Schedule and queue APIs require a session | `backend/tests/schedule.test.js` | `it("Schedule and queue APIs require a session")` |
 | US-11.4 | Requestor cannot open the schedule API | `backend/tests/schedule.test.js` | `it("Requestor cannot open the schedule API")` |
 | US-11.4 | Maintenance cannot open the service queue API | `backend/tests/schedule.test.js` | `it("Maintenance cannot open the service queue API")` |
+| US-11.4 | Schedule and queue storage failures return a safe error | `backend/tests/schedule.test.js` | `it("Schedule and queue storage failures return a safe error")` |
 | US-11.4 | Schedule navigation requires an allowed role | `frontend/tests/Schedule.test.js` | `it("Schedule navigation requires an allowed role")` |
 | US-11.4 | Requestor and maintenance are sent Home from Schedule | `frontend/tests/Schedule.test.js` | `it("Requestor and maintenance are sent Home from Schedule")` |
 
@@ -371,15 +413,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-014** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 11 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-014** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 11 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 
