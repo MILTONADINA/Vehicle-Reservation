@@ -241,7 +241,7 @@ Schedule query: optional `weekStart` (Monday `YYYY-MM-DD`; defaults to the Monda
 | GET | `/vehicle-t6/vehicles/:vehicleId/service-logs` | admin, maintenance | `200`, array of ServiceLog objects |
 | POST | `/vehicle-t6/vehicles/:vehicleId/service-logs` | admin, maintenance | `201`, new ServiceLog object |
 
-Vehicle summary: `{ "id", "make", "model", "year", "plateNumber", "color", "areaId" }`, sorted by make, model, id. POST mileage body: `{ "logDate", "mileage" }`. MileageLog: `{ "id", "vehicleId", "logDate", "mileage", "loggedByUserId", "createdAt" }`. POST service body: `{ "serviceDate", "serviceType", "note"? }`. ServiceLog: `{ "id", "vehicleId", "serviceDate", "serviceType", "note", "loggedByUserId", "createdAt" }`. `serviceType` is `repair`, `oil_change`, or `tire_replacement`. `loggedByUserId` is always the signed-in user. Extra body fields are ignored. Mileage lists sort by logDate desc, id desc. Service lists sort by serviceDate desc, id desc. New mileage must be ≥ the latest reading for that vehicle (latest by logDate, then id).
+Vehicle summary: `{ "id", "make", "model", "year", "plateNumber", "color", "areaId" }`, sorted by make, model, id. POST mileage body: `{ "logDate", "mileage" }`. MileageLog: `{ "id", "vehicleId", "logDate", "mileage", "loggedByUserId", "createdAt" }`. POST service body: `{ "serviceDate", "serviceType", "note"? }`. ServiceLog: `{ "id", "vehicleId", "serviceDate", "serviceType", "note", "loggedByUserId", "createdAt" }`. `serviceType` is `repair`, `oil_change`, or `tire_replacement`. `loggedByUserId` is always the signed-in user. Extra body fields are ignored. Mileage lists sort by logDate desc, id desc. Service lists sort by serviceDate desc, id desc. New mileage must fit between chronological neighbors (previous logDate≤new date by logDate/id; next logDate after new date) so history stays non-decreasing; create locks the vehicle row.
 
 | Condition | Status | Message |
 |-----------|--------|---------|
@@ -249,7 +249,8 @@ Vehicle summary: `{ "id", "make", "model", "year", "plateNumber", "color", "area
 | Invalid service body, type, or date | 400 | `Invalid service log data.` |
 | Invalid vehicle route id | 400 | `Vehicle id must be a positive integer.` |
 | Missing vehicle | 404 | `Vehicle with id=<id> not found.` |
-| Mileage lower than latest reading | 409 | `Mileage cannot be lower than the latest reading.` |
+| Mileage lower than previous neighbor | 409 | `Mileage cannot be lower than the latest reading.` |
+| Mileage higher than next neighbor | 409 | `Mileage cannot be higher than the next reading.` |
 | Delete of vehicle that still has mileage or service logs | 409 | `Vehicle is in use.` |
 | Delete of user who logged a mileage or service entry | 409 | `User is in use.` |
 | Other database failure on mileage | 500 | `Mileage request failed.` |

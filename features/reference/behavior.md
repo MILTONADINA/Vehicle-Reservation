@@ -248,7 +248,7 @@ They do **not** authorize new scope — implement only from `features/feature-*.
 | Rule | Enforcement | Introduced |
 |------|-------------|------------|
 | Admin and maintenance list every vehicle for logging and create/list mileage and service logs for any vehicle; requestor and area_admin receive 403 | `maintenanceLog.routes.js` `requireRole("admin", "maintenance")` | Feature 12 |
-| New mileage must be ≥ latest reading for that vehicle (latest by logDate, then id); lower readings return 409 without saving | `maintenanceLog.controller.js` `createMileage` | Feature 12 |
+| New mileage must fit between chronological neighbors (non-decreasing by logDate, then id); too low/high return 409 without saving; create locks the vehicle row | `maintenanceLog.controller.js` `createMileage` | Feature 12 |
 | Service type is `repair`, `oil_change`, or `tire_replacement`; blank note stored as null; `loggedByUserId` always from the session | `maintenanceLog.controller.js` | Feature 12 |
 | Deleting a vehicle with mileage/service logs or a user who logged them returns 409 `Vehicle is in use.` / `User is in use.` | FK `RESTRICT` on `mileageLogs` / `serviceLogs` | Feature 12 |
 

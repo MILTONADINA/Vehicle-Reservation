@@ -145,19 +145,38 @@ controller.createMileage = async (req, res) => {
 
   try {
     const created = await db.sequelize.transaction(async (transaction) => {
-      const vehicle = await db.vehicle.findByPk(vehicleId, { transaction });
+      // Lock the vehicle row so concurrent first readings (and all later writes) serialize.
+      const vehicle = await db.vehicle.findByPk(vehicleId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
       if (!vehicle) return { missing: true };
 
-      const latest = await db.mileageLog.findOne({
-        where: { vehicleId },
+      // New row gets the next id, so it sorts after every existing log on the same logDate.
+      const previous = await db.mileageLog.findOne({
+        where: {
+          vehicleId,
+          logDate: { [db.Sequelize.Op.lte]: fields.logDate },
+        },
         order: [
           ["logDate", "DESC"],
           ["id", "DESC"],
         ],
         transaction,
-        lock: transaction.LOCK.UPDATE,
       });
-      if (latest && fields.mileage < latest.mileage) return { tooLow: true };
+      const next = await db.mileageLog.findOne({
+        where: {
+          vehicleId,
+          logDate: { [db.Sequelize.Op.gt]: fields.logDate },
+        },
+        order: [
+          ["logDate", "ASC"],
+          ["id", "ASC"],
+        ],
+        transaction,
+      });
+      if (previous && fields.mileage < previous.mileage) return { tooLow: true };
+      if (next && fields.mileage > next.mileage) return { tooHigh: true };
 
       const row = await db.mileageLog.create(
         {
@@ -174,6 +193,9 @@ controller.createMileage = async (req, res) => {
     if (created.missing) return vehicleNotFound(res, vehicleId);
     if (created.tooLow) {
       return res.status(409).send({ message: "Mileage cannot be lower than the latest reading." });
+    }
+    if (created.tooHigh) {
+      return res.status(409).send({ message: "Mileage cannot be higher than the next reading." });
     }
     return res.status(201).send(mileagePayload(created.row));
   } catch (error) {

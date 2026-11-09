@@ -2,6 +2,7 @@
  * Feature 12 — Mileage & Service Logs
  * Spec: features/feature-12-mileage-service-logs.md
  */
+import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../server.js";
 import db from "../app/models/index.js";
@@ -94,6 +95,22 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);
     });
+
+    it("Maintenance vehicles sort by make model then id", async () => {
+      const fordEscape = await makeVehicle({ make: "Ford", model: "Escape" });
+      const fordTransitB = await makeVehicle({ make: "Ford", model: "Transit" });
+      const fordTransitA = await makeVehicle({ make: "Ford", model: "Transit" });
+      const chevy = await makeVehicle({ make: "Chevrolet", model: "Express" });
+      const { token } = await signInAs("maintenance");
+      const response = await listVehicles(token);
+      expect(response.status).toBe(200);
+      expect(response.body.map((row) => row.id)).toEqual([
+        chevy.id,
+        fordEscape.id,
+        fordTransitB.id,
+        fordTransitA.id,
+      ]);
+    });
   });
 
   describe("US-12.2 — Log vehicle mileage", () => {
@@ -143,6 +160,62 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(await db.mileageLog.count()).toBe(before);
     });
 
+    it("Backdated mileage fits between neighboring readings", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-05", mileage: 50000 });
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-01", mileage: 49000 });
+      expect(response.status).toBe(201);
+      expect(response.body.mileage).toBe(49000);
+    });
+
+    it("Backdated mileage above the next reading is rejected", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-05", mileage: 50000 });
+      const before = await db.mileageLog.count();
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-01", mileage: 51000 });
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "Mileage cannot be higher than the next reading." });
+      expect(await db.mileageLog.count()).toBe(before);
+    });
+
+    it("Latest mileage for ordering uses logDate then id", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-03", mileage: 100 });
+      await createMileage(token, vehicle.id, { logDate: "2026-11-03", mileage: 200 });
+      const before = await db.mileageLog.count();
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-04", mileage: 150 });
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "Mileage cannot be lower than the latest reading." });
+      expect(await db.mileageLog.count()).toBe(before);
+    });
+
+    it("Mileage at the maximum is accepted", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-10-28", mileage: 2000000 });
+      expect(response.status).toBe(201);
+      expect(response.body.mileage).toBe(2000000);
+    });
+
+    it("Mileage above the maximum is rejected", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-10-28", mileage: 2000001 });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "Invalid mileage data." });
+    });
+
+    it("String mileage is rejected", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-10-28", mileage: "100" });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "Invalid mileage data." });
+    });
+
     it("Invalid mileage data is rejected", async () => {
       const vehicle = await makeVehicle();
       const { token } = await signInAs("maintenance");
@@ -180,6 +253,16 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       const response = await listMileage(token, vehicle.id);
       expect(response.status).toBe(200);
       expect(response.body.map((row) => row.id)).toEqual([newer.body.id, older.body.id]);
+    });
+
+    it("Mileage logs on the same date sort by id descending", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const first = await createMileage(token, vehicle.id, { logDate: "2026-10-28", mileage: 100 });
+      const second = await createMileage(token, vehicle.id, { logDate: "2026-10-28", mileage: 200 });
+      const response = await listMileage(token, vehicle.id);
+      expect(response.status).toBe(200);
+      expect(response.body.map((row) => row.id)).toEqual([second.body.id, first.body.id]);
     });
   });
 
@@ -238,6 +321,30 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(response.body.note).toBeNull();
     });
 
+    it("Service note is trimmed", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const response = await createService(token, vehicle.id, {
+        serviceDate: "2026-10-28",
+        serviceType: "repair",
+        note: "  Keep case and  spaces  ",
+      });
+      expect(response.status).toBe(201);
+      expect(response.body.note).toBe("Keep case and  spaces");
+    });
+
+    it("Oversized service note is rejected", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const response = await createService(token, vehicle.id, {
+        serviceDate: "2026-10-28",
+        serviceType: "repair",
+        note: "x".repeat(1001),
+      });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "Invalid service log data." });
+    });
+
     it("Unknown service type is rejected", async () => {
       const vehicle = await makeVehicle();
       const { token } = await signInAs("maintenance");
@@ -249,6 +356,17 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(response.status).toBe(400);
       expect(response.body).toEqual({ message: "Invalid service log data." });
       expect(await db.serviceLog.count()).toBe(before);
+    });
+
+    it("Invalid service date is rejected", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const response = await createService(token, vehicle.id, {
+        serviceDate: "2026-13-01",
+        serviceType: "repair",
+      });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "Invalid service log data." });
     });
 
     it("Service logs list newest first", async () => {
@@ -265,6 +383,22 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       const response = await listService(token, vehicle.id);
       expect(response.status).toBe(200);
       expect(response.body.map((row) => row.id)).toEqual([newer.body.id, older.body.id]);
+    });
+
+    it("Service logs on the same date sort by id descending", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      const first = await createService(token, vehicle.id, {
+        serviceDate: "2026-10-28",
+        serviceType: "repair",
+      });
+      const second = await createService(token, vehicle.id, {
+        serviceDate: "2026-10-28",
+        serviceType: "oil_change",
+      });
+      const response = await listService(token, vehicle.id);
+      expect(response.status).toBe(200);
+      expect(response.body.map((row) => row.id)).toEqual([second.body.id, first.body.id]);
     });
   });
 
@@ -336,6 +470,24 @@ describe("Feature 12 — Mileage & Service Logs", () => {
           expect(response.status).toBe(400);
           expect(response.body).toEqual({ message: "Vehicle id must be a positive integer." });
         }
+      }
+    });
+
+    it("Mileage and service storage failures return a safe error", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("admin");
+      const failures = [
+        [() => jest.spyOn(db.mileageLog, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost")), () => listMileage(token, vehicle.id), "Mileage request failed."],
+        [() => jest.spyOn(db.serviceLog, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost")), () => listService(token, vehicle.id), "Service log request failed."],
+        [() => jest.spyOn(db.vehicle, "findAll").mockRejectedValueOnce(new Error("SQLSTATE connection lost")), () => listVehicles(token), "Mileage request failed."],
+      ];
+      for (const [arm, run, message] of failures) {
+        const spy = arm();
+        const response = await run();
+        spy.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ message });
+        expect(JSON.stringify(response.body)).not.toMatch(/SQLSTATE|connection lost/i);
       }
     });
 

@@ -196,6 +196,16 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(wrapper.text()).toContain("Vehicles could not be loaded.");
       expect(wrapper.text()).not.toContain("No vehicles found.");
     });
+
+    it("Choosing a vehicle opens its log page", async () => {
+      const wrapper = await openMaintenance("maintenance");
+      mockVehiclePage();
+      await rows(wrapper)[1].trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("maintenance-vehicle");
+      expect(router.currentRoute.value.params.vehicleId).toBe("3");
+      expect(wrapper.find('[data-testid="maintenance-vehicle-heading"]').text()).toContain("Ford Transit");
+    });
   });
 
   describe("US-12.2 — Log vehicle mileage", () => {
@@ -255,6 +265,48 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(dialogOpen("mileage-dialog")).toBe(true);
       expect(bodyText()).toContain("Mileage could not be saved.");
       expect(wrapper.findAll('[data-testid="mileage-row"]')).toHaveLength(1);
+    });
+
+    it("Vehicle log page distinguishes mileage loading empty and failed states", async () => {
+      Utils.setStore("user", { ...account("maintenance"), token: "session-token" });
+      AuthServices.me.mockResolvedValue({ data: account("maintenance") });
+      MaintenanceLogServices.listVehicles.mockResolvedValue({ data: fleet });
+      MaintenanceLogServices.listService.mockResolvedValue({ data: [] });
+      let resolveMileage;
+      MaintenanceLogServices.listMileage.mockReturnValue(new Promise((resolve) => { resolveMileage = resolve; }));
+      let wrapper = await mountApp("/maintenance/vehicles/3");
+      expect(wrapper.find('[data-testid="mileage-loading"]').exists()).toBe(true);
+      expect(wrapper.text()).not.toContain("No mileage logs found.");
+
+      resolveMileage({ data: [] });
+      await flushPromises();
+      expect(wrapper.find('[data-testid="mileage-loading"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("No mileage logs found.");
+      wrapper.unmount();
+      mounted.pop();
+
+      MaintenanceLogServices.listMileage.mockRejectedValue(apiError(500, "Mileage request failed."));
+      wrapper = await mountApp("/maintenance/vehicles/3");
+      expect(wrapper.text()).toContain("Mileage request failed.");
+      expect(wrapper.text()).not.toContain("No mileage logs found.");
+      wrapper.unmount();
+      mounted.pop();
+
+      MaintenanceLogServices.listMileage.mockRejectedValue(apiError(500));
+      wrapper = await mountApp("/maintenance/vehicles/3");
+      expect(wrapper.text()).toContain("Mileage could not be loaded.");
+      expect(wrapper.text()).not.toContain("No mileage logs found.");
+    });
+
+    it("Mileage dialog rejects out of range values", async () => {
+      const wrapper = await openVehicleLogs();
+      await wrapper.find('[data-testid="add-mileage"]').trigger("click");
+      await flushPromises();
+      await fill("mileage-date-input", "2026-10-29");
+      await fill("mileage-value-input", "2000001");
+      await click("mileage-save");
+      expect(dialogOpen("mileage-dialog")).toBe(true);
+      expect(MaintenanceLogServices.createMileage).not.toHaveBeenCalled();
     });
   });
 
@@ -325,6 +377,49 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(dialogOpen("service-dialog")).toBe(true);
       expect(bodyText()).toContain("Service log could not be saved.");
       expect(wrapper.findAll('[data-testid="service-row"]')).toHaveLength(1);
+    });
+
+    it("Vehicle log page distinguishes service loading empty and failed states", async () => {
+      Utils.setStore("user", { ...account("maintenance"), token: "session-token" });
+      AuthServices.me.mockResolvedValue({ data: account("maintenance") });
+      MaintenanceLogServices.listVehicles.mockResolvedValue({ data: fleet });
+      MaintenanceLogServices.listMileage.mockResolvedValue({ data: [] });
+      let resolveService;
+      MaintenanceLogServices.listService.mockReturnValue(new Promise((resolve) => { resolveService = resolve; }));
+      let wrapper = await mountApp("/maintenance/vehicles/3");
+      expect(wrapper.find('[data-testid="service-loading"]').exists()).toBe(true);
+      expect(wrapper.text()).not.toContain("No service logs found.");
+
+      resolveService({ data: [] });
+      await flushPromises();
+      expect(wrapper.find('[data-testid="service-loading"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("No service logs found.");
+      wrapper.unmount();
+      mounted.pop();
+
+      MaintenanceLogServices.listService.mockRejectedValue(apiError(500, "Service log request failed."));
+      wrapper = await mountApp("/maintenance/vehicles/3");
+      expect(wrapper.text()).toContain("Service log request failed.");
+      expect(wrapper.text()).not.toContain("No service logs found.");
+      wrapper.unmount();
+      mounted.pop();
+
+      MaintenanceLogServices.listService.mockRejectedValue(apiError(500));
+      wrapper = await mountApp("/maintenance/vehicles/3");
+      expect(wrapper.text()).toContain("Service logs could not be loaded.");
+      expect(wrapper.text()).not.toContain("No service logs found.");
+    });
+
+    it("Service dialog rejects an oversized note", async () => {
+      const wrapper = await openVehicleLogs();
+      await wrapper.find('[data-testid="add-service"]').trigger("click");
+      await flushPromises();
+      await fill("service-date-input", "2026-10-29");
+      await choose("service-type-input", "repair");
+      await fill("service-note-input", "x".repeat(1001));
+      await click("service-save");
+      expect(dialogOpen("service-dialog")).toBe(true);
+      expect(MaintenanceLogServices.createService).not.toHaveBeenCalled();
     });
   });
 
