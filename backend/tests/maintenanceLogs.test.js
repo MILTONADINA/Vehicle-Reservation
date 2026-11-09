@@ -180,6 +180,52 @@ describe("Feature 12 — Mileage & Service Logs", () => {
       expect(await db.mileageLog.count()).toBe(before);
     });
 
+    it("Same-day mileage lower than an existing reading is rejected", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-03", mileage: 100 });
+      const before = await db.mileageLog.count();
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-03", mileage: 50 });
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "Mileage cannot be lower than the latest reading." });
+      expect(await db.mileageLog.count()).toBe(before);
+    });
+
+    it("Backdated mileage equal to the next reading is allowed", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-05", mileage: 50000 });
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-01", mileage: 50000 });
+      expect(response.status).toBe(201);
+      expect(response.body.mileage).toBe(50000);
+    });
+
+    it("Previous mileage neighbor uses logDate not id", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-05", mileage: 50000 });
+      await createMileage(token, vehicle.id, { logDate: "2026-11-01", mileage: 40000 });
+      const before = await db.mileageLog.count();
+      // Dated after both logs; between their mileages. Previous by date is 50000, not the newer id 40000.
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-06", mileage: 45000 });
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "Mileage cannot be lower than the latest reading." });
+      expect(await db.mileageLog.count()).toBe(before);
+    });
+
+    it("Next mileage neighbor is the earliest later reading", async () => {
+      const vehicle = await makeVehicle();
+      const { token } = await signInAs("maintenance");
+      await createMileage(token, vehicle.id, { logDate: "2026-11-05", mileage: 40000 });
+      await createMileage(token, vehicle.id, { logDate: "2026-11-10", mileage: 60000 });
+      const before = await db.mileageLog.count();
+      // Between the two later mileages; next must be the earliest later log (40000), not 60000.
+      const response = await createMileage(token, vehicle.id, { logDate: "2026-11-01", mileage: 50000 });
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ message: "Mileage cannot be higher than the next reading." });
+      expect(await db.mileageLog.count()).toBe(before);
+    });
+
     it("Latest mileage for ordering uses logDate then id", async () => {
       const vehicle = await makeVehicle();
       const { token } = await signInAs("maintenance");

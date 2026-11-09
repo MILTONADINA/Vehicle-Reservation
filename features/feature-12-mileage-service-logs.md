@@ -302,6 +302,26 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **When** a maintenance user posts mileage 51000 on 2026-11-01
 * **Then** the response is 409 with message Mileage cannot be higher than the next reading. and no log is stored
 
+#### Scenario: Same-day mileage lower than an existing reading is rejected
+* **Given** vehicle id 3 has a mileage log of 100 on 2026-11-03
+* **When** a maintenance user posts mileage 50 on 2026-11-03
+* **Then** the response is 409 with message Mileage cannot be lower than the latest reading. and no log is stored
+
+#### Scenario: Backdated mileage equal to the next reading is allowed
+* **Given** vehicle id 3 has a mileage log of 50000 on 2026-11-05
+* **When** a maintenance user posts mileage 50000 on 2026-11-01
+* **Then** the response is 201 with mileage 50000
+
+#### Scenario: Previous mileage neighbor uses logDate not id
+* **Given** vehicle id 3 has 50000 on 2026-11-05 and a later-created 40000 on 2026-11-01
+* **When** a maintenance user posts mileage 45000 on 2026-11-06
+* **Then** the response is 409 with message Mileage cannot be lower than the latest reading. and no log is stored
+
+#### Scenario: Next mileage neighbor is the earliest later reading
+* **Given** vehicle id 3 has 40000 on 2026-11-05 and 60000 on 2026-11-10
+* **When** a maintenance user posts mileage 50000 on 2026-11-01
+* **Then** the response is 409 with message Mileage cannot be higher than the next reading. and no log is stored
+
 #### Scenario: Latest mileage for ordering uses logDate then id
 * **Given** vehicle id 3 has two logs on 2026-11-03 with mileages 100 then 200 by id order
 * **When** a maintenance user posts mileage 150 on 2026-11-04
@@ -516,6 +536,10 @@ Exact `it(...)` titles. Backend file: `backend/tests/maintenanceLogs.test.js`. F
 | US-12.2 | Mileage lower than the latest reading is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Mileage lower than the latest reading is rejected")` |
 | US-12.2 | Backdated mileage fits between neighboring readings | `backend/tests/maintenanceLogs.test.js` | `it("Backdated mileage fits between neighboring readings")` |
 | US-12.2 | Backdated mileage above the next reading is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Backdated mileage above the next reading is rejected")` |
+| US-12.2 | Same-day mileage lower than an existing reading is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Same-day mileage lower than an existing reading is rejected")` |
+| US-12.2 | Backdated mileage equal to the next reading is allowed | `backend/tests/maintenanceLogs.test.js` | `it("Backdated mileage equal to the next reading is allowed")` |
+| US-12.2 | Previous mileage neighbor uses logDate not id | `backend/tests/maintenanceLogs.test.js` | `it("Previous mileage neighbor uses logDate not id")` |
+| US-12.2 | Next mileage neighbor is the earliest later reading | `backend/tests/maintenanceLogs.test.js` | `it("Next mileage neighbor is the earliest later reading")` |
 | US-12.2 | Latest mileage for ordering uses logDate then id | `backend/tests/maintenanceLogs.test.js` | `it("Latest mileage for ordering uses logDate then id")` |
 | US-12.2 | Mileage at the maximum is accepted | `backend/tests/maintenanceLogs.test.js` | `it("Mileage at the maximum is accepted")` |
 | US-12.2 | Mileage above the maximum is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Mileage above the maximum is rejected")` |
