@@ -9,6 +9,7 @@ import reservationRequestRoutes from "./reservationRequest.routes.js";
 import reservationEmailRoutes from "./reservationEmail.routes.js";
 import issueRoutes from "./issue.routes.js";
 import scheduleRoutes from "./schedule.routes.js";
+import maintenanceLogRoutes from "./maintenanceLog.routes.js";
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.get("/health", (_req, res) => {
 router.use("/", authRoutes);
 router.use("/areas", areaRoutes);
 router.use("/users", userRoutes);
+router.use("/", maintenanceLogRoutes);
 router.use("/vehicles", vehicleRoutes);
 router.use("/drivers", driverRoutes);
 router.use("/destinations", destinationRoutes);

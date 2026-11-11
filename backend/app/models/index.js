@@ -9,6 +9,8 @@ import destinationModel from "./destination.model.js";
 import reservationRequestModel from "./reservationRequest.model.js";
 import reservationEmailModel from "./reservationEmail.model.js";
 import issueReportModel from "./issueReport.model.js";
+import mileageLogModel from "./mileageLog.model.js";
+import serviceLogModel from "./serviceLog.model.js";
 
 const db = {};
 db.Sequelize = Sequelize;
@@ -23,6 +25,8 @@ db.destination = destinationModel(sequelize, Sequelize);
 db.reservationRequest = reservationRequestModel(sequelize, Sequelize);
 db.reservationEmail = reservationEmailModel(sequelize, Sequelize);
 db.issueReport = issueReportModel(sequelize, Sequelize);
+db.mileageLog = mileageLogModel(sequelize, Sequelize);
+db.serviceLog = serviceLogModel(sequelize, Sequelize);
 
 // Sessions belong to one user and are deleted with that user.
 const sessionUserKey = { name: "userId", allowNull: false };
@@ -83,5 +87,25 @@ db.issueReport.belongsTo(db.vehicle, { foreignKey: issueVehicleKey, as: "vehicle
 const issueReporterKey = { name: "reportedByUserId", allowNull: false };
 db.user.hasMany(db.issueReport, { foreignKey: issueReporterKey, as: "issueReports", onDelete: "RESTRICT" });
 db.issueReport.belongsTo(db.user, { foreignKey: issueReporterKey, as: "reporter", onDelete: "RESTRICT" });
+
+// Mileage logs belong to one vehicle. A vehicle with mileage logs cannot be deleted.
+const mileageVehicleKey = { name: "vehicleId", allowNull: false };
+db.vehicle.hasMany(db.mileageLog, { foreignKey: mileageVehicleKey, as: "mileageLogs", onDelete: "RESTRICT" });
+db.mileageLog.belongsTo(db.vehicle, { foreignKey: mileageVehicleKey, as: "vehicle", onDelete: "RESTRICT" });
+
+// The signed-in logger owns the mileage row. A user who logged mileage cannot be deleted.
+const mileageLoggerKey = { name: "loggedByUserId", allowNull: false };
+db.user.hasMany(db.mileageLog, { foreignKey: mileageLoggerKey, as: "mileageLogs", onDelete: "RESTRICT" });
+db.mileageLog.belongsTo(db.user, { foreignKey: mileageLoggerKey, as: "logger", onDelete: "RESTRICT" });
+
+// Service logs belong to one vehicle. A vehicle with service logs cannot be deleted.
+const serviceVehicleKey = { name: "vehicleId", allowNull: false };
+db.vehicle.hasMany(db.serviceLog, { foreignKey: serviceVehicleKey, as: "serviceLogs", onDelete: "RESTRICT" });
+db.serviceLog.belongsTo(db.vehicle, { foreignKey: serviceVehicleKey, as: "vehicle", onDelete: "RESTRICT" });
+
+// The signed-in logger owns the service row. A user who logged a service cannot be deleted.
+const serviceLoggerKey = { name: "loggedByUserId", allowNull: false };
+db.user.hasMany(db.serviceLog, { foreignKey: serviceLoggerKey, as: "serviceLogs", onDelete: "RESTRICT" });
+db.serviceLog.belongsTo(db.user, { foreignKey: serviceLoggerKey, as: "logger", onDelete: "RESTRICT" });
 
 export default db;

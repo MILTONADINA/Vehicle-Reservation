@@ -231,6 +231,31 @@ Schedule query: optional `weekStart` (Monday `YYYY-MM-DD`; defaults to the Monda
 | Schedule database failure | 500 | `Schedule request failed.` |
 | Service queue database failure | 500 | `Service queue request failed.` |
 
+## Mileage & Service Logs
+
+| Method | Endpoint | Allowed role | Success |
+|--------|----------|--------------|---------|
+| GET | `/vehicle-t6/maintenance/vehicles` | admin, maintenance | `200`, array of vehicle summary objects |
+| GET | `/vehicle-t6/vehicles/:vehicleId/mileage-logs` | admin, maintenance | `200`, array of MileageLog objects |
+| POST | `/vehicle-t6/vehicles/:vehicleId/mileage-logs` | admin, maintenance | `201`, new MileageLog object |
+| GET | `/vehicle-t6/vehicles/:vehicleId/service-logs` | admin, maintenance | `200`, array of ServiceLog objects |
+| POST | `/vehicle-t6/vehicles/:vehicleId/service-logs` | admin, maintenance | `201`, new ServiceLog object |
+
+Vehicle summary: `{ "id", "make", "model", "year", "plateNumber", "color", "areaId" }`, sorted by make, model, id. POST mileage body: `{ "logDate", "mileage" }`. MileageLog: `{ "id", "vehicleId", "logDate", "mileage", "loggedByUserId", "createdAt" }`. POST service body: `{ "serviceDate", "serviceType", "note"? }`. ServiceLog: `{ "id", "vehicleId", "serviceDate", "serviceType", "note", "loggedByUserId", "createdAt" }`. `serviceType` is `repair`, `oil_change`, or `tire_replacement`. `loggedByUserId` is always the signed-in user. Extra body fields are ignored. Mileage lists sort by logDate desc, id desc. Service lists sort by serviceDate desc, id desc. New mileage must fit between chronological neighbors (previous logDate≤new date by logDate/id; next logDate after new date) so history stays non-decreasing; create locks the vehicle row.
+
+| Condition | Status | Message |
+|-----------|--------|---------|
+| Invalid mileage body or date | 400 | `Invalid mileage data.` |
+| Invalid service body, type, or date | 400 | `Invalid service log data.` |
+| Invalid vehicle route id | 400 | `Vehicle id must be a positive integer.` |
+| Missing vehicle | 404 | `Vehicle with id=<id> not found.` |
+| Mileage lower than previous neighbor | 409 | `Mileage cannot be lower than the latest reading.` |
+| Mileage higher than next neighbor | 409 | `Mileage cannot be higher than the next reading.` |
+| Delete of vehicle that still has mileage or service logs | 409 | `Vehicle is in use.` |
+| Delete of user who logged a mileage or service entry | 409 | `User is in use.` |
+| Other database failure on mileage | 500 | `Mileage request failed.` |
+| Other database failure on service logs | 500 | `Service log request failed.` |
+
 ## Provenance
 
 | Area | Introduced |
@@ -246,3 +271,4 @@ Schedule query: optional `weekStart` (Monday `YYYY-MM-DD`; defaults to the Monda
 | Reservation emails send-now; status-email job on status change and cancel | Feature 9 |
 | Issue reports create and list (per-request and open) | Feature 10 |
 | Weekly schedule and service queue | Feature 11 |
+| Mileage and service logs; maintenance vehicle list | Feature 12 |

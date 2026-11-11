@@ -2,7 +2,7 @@
 
 **Feature ID:** 12  
 **Branch pattern:** `feature/12-mileage-service-logs`  
-**Status:** Ready  
+**Status:** Implemented  
 **Created:** 2026-10-28  
 **Input:** Let maintenance staff (and admins) see the vehicle list, log mileage with a date and odometer reading, and log services such as repair, oil change, or tire replacement.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md)
@@ -59,7 +59,7 @@ Every story is P1: each one must ship for the assignment’s mileage and service
 
 * **FR-001:** This feature MUST reuse Feature 1 authentication and roles and the Vehicle records from Feature 4. It MUST NOT create vehicles, assign areas, create reservation requests, or send email.
 * **FR-002:** A mileage log MUST store vehicleId, logDate, mileage, loggedByUserId, and createdAt. The server MUST generate id. logDate MUST be a calendar date in `YYYY-MM-DD` form. mileage MUST be an integer from 0 through 2,000,000.
-* **FR-003:** When the vehicle already has mileage logs, a new mileage value MUST be greater than or equal to the latest log’s mileage for that vehicle (latest by logDate, then id). A lower reading MUST return 409 `Mileage cannot be lower than the latest reading.` without saving.
+* **FR-003:** Mileage history MUST stay non-decreasing when ordered by logDate ascending, then id ascending. A new reading is placed after every existing log on the same logDate (new id is last). It MUST be ≥ the previous neighbor’s mileage (latest log with logDate ≤ the new date) when that neighbor exists, and ≤ the next neighbor’s mileage (earliest log with logDate after the new date) when that neighbor exists. Too low MUST return 409 `Mileage cannot be lower than the latest reading.` Too high versus the next reading MUST return 409 `Mileage cannot be higher than the next reading.` Neither case may save a row. Create MUST lock the vehicle row in a transaction so concurrent first readings serialize.
 * **FR-004:** A service log MUST store vehicleId, serviceDate, serviceType, optional note, loggedByUserId, and createdAt. The server MUST generate id. serviceDate MUST be `YYYY-MM-DD`. serviceType MUST be one of `repair`, `oil_change`, or `tire_replacement`.
 * **FR-005:** note MUST be optional. When present it MUST be at most 1,000 characters after trimming outer spaces and MUST keep its letter case and internal spaces. A blank or whitespace-only note MUST be stored as null. Request-body properties outside the allowed fields MUST be ignored on create.
 * **FR-006:** Admin and maintenance MUST list every vehicle for logging, create mileage logs, create service logs, and list mileage and service history for any vehicle. Requestor and area_admin MUST receive the Feature 1 403 response for every Feature 12 endpoint. Signed-out requests MUST receive 401.
@@ -78,15 +78,15 @@ Every story is P1: each one must ship for the assignment’s mileage and service
 
 * North’s maintenance person views vehicles, logs mileage (date, current mileage), and logs services (repair, oil change, tire replacement). Admin can do the same so fleet oversight is not blocked when maintenance is offline.
 * Area admins manage area fleet records in Feature 4 but do not write mileage or service logs in this feature.
-* Odometer readings do not go backward relative to the latest stored reading for that vehicle.
+* Odometer history stays non-decreasing by date (and id on the same date), including when a reading is backdated between existing logs.
 * Feature 10 already lets maintenance read `maintenance_need` issue reports. This feature does not duplicate that API.
 * Deleting or editing past logs is out of scope.
 
 ## Edge Cases
 
 * The first mileage log on a vehicle may use any mileage in range; there is no prior reading to compare.
-* Two logs on the same date are allowed when mileage does not go backward.
-* A blank service note is stored as null.
+* Two logs on the same date are allowed when mileage does not go backward relative to neighbors.
+* A backdated reading may sit between earlier and later logs when its mileage fits; a reading above the next later log is rejected.* A blank service note is stored as null.
 * Failed creates leave prior logs unchanged.
 * A forged loggedByUserId in the body does not change the saved reporter.
 * Deleting a referenced vehicle or logger user is blocked with 409; existing logs stay.
@@ -182,7 +182,8 @@ ServiceLog object:
 | Invalid service body, type, or date | 400 | `Invalid service log data.` |
 | Invalid vehicle route id | 400 | `Vehicle id must be a positive integer.` |
 | Missing vehicle | 404 | `Vehicle with id=<id> not found.` |
-| Mileage lower than latest reading | 409 | `Mileage cannot be lower than the latest reading.` |
+| Mileage lower than previous neighbor | 409 | `Mileage cannot be lower than the latest reading.` |
+| Mileage higher than next neighbor | 409 | `Mileage cannot be higher than the next reading.` |
 | Delete of vehicle that still has mileage or service logs | 409 | `Vehicle is in use.` |
 | Delete of user who logged a mileage or service entry | 409 | `User is in use.` |
 | Other database failure on mileage | 500 | `Mileage request failed.` |
@@ -244,6 +245,11 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **When** a maintenance user lists maintenance vehicles
 * **Then** the response is 200 with []
 
+#### Scenario: Maintenance vehicles sort by make model then id
+* **Given** vehicles share makes or models across areas
+* **When** a maintenance user lists maintenance vehicles
+* **Then** the response is sorted by make, then model, then id
+
 #### Scenario: Maintenance page shows vehicle rows
 * **Given** GET /maintenance/vehicles returns vehicle summaries
 * **When** a maintenance user opens /maintenance from MenuBar
@@ -258,6 +264,11 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **Given** GET /maintenance/vehicles fails with an API message or no response message
 * **When** the list request completes
 * **Then** the page shows the message or Vehicles could not be loaded. and does not show No vehicles found.
+
+#### Scenario: Choosing a vehicle opens its log page
+* **Given** the Maintenance page lists vehicles
+* **When** the user selects a vehicle row
+* **Then** the app opens /maintenance/vehicles/:id for that vehicle
 
 ### US-12.2 — Log vehicle mileage
 
@@ -281,6 +292,56 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **When** a maintenance user posts mileage 45000
 * **Then** the response is 409 with message Mileage cannot be lower than the latest reading. and no log is stored
 
+#### Scenario: Backdated mileage fits between neighboring readings
+* **Given** vehicle id 3 has a mileage log of 50000 on 2026-11-05
+* **When** a maintenance user posts mileage 49000 on 2026-11-01
+* **Then** the response is 201 with mileage 49000
+
+#### Scenario: Backdated mileage above the next reading is rejected
+* **Given** vehicle id 3 has a mileage log of 50000 on 2026-11-05
+* **When** a maintenance user posts mileage 51000 on 2026-11-01
+* **Then** the response is 409 with message Mileage cannot be higher than the next reading. and no log is stored
+
+#### Scenario: Same-day mileage lower than an existing reading is rejected
+* **Given** vehicle id 3 has a mileage log of 100 on 2026-11-03
+* **When** a maintenance user posts mileage 50 on 2026-11-03
+* **Then** the response is 409 with message Mileage cannot be lower than the latest reading. and no log is stored
+
+#### Scenario: Backdated mileage equal to the next reading is allowed
+* **Given** vehicle id 3 has a mileage log of 50000 on 2026-11-05
+* **When** a maintenance user posts mileage 50000 on 2026-11-01
+* **Then** the response is 201 with mileage 50000
+
+#### Scenario: Previous mileage neighbor uses logDate not id
+* **Given** vehicle id 3 has 50000 on 2026-11-05 and a later-created 40000 on 2026-11-01
+* **When** a maintenance user posts mileage 45000 on 2026-11-06
+* **Then** the response is 409 with message Mileage cannot be lower than the latest reading. and no log is stored
+
+#### Scenario: Next mileage neighbor is the earliest later reading
+* **Given** vehicle id 3 has 40000 on 2026-11-05 and 60000 on 2026-11-10
+* **When** a maintenance user posts mileage 50000 on 2026-11-01
+* **Then** the response is 409 with message Mileage cannot be higher than the next reading. and no log is stored
+
+#### Scenario: Latest mileage for ordering uses logDate then id
+* **Given** vehicle id 3 has two logs on 2026-11-03 with mileages 100 then 200 by id order
+* **When** a maintenance user posts mileage 150 on 2026-11-04
+* **Then** the response is 409 with message Mileage cannot be lower than the latest reading.
+
+#### Scenario: Mileage at the maximum is accepted
+* **Given** vehicle id 3 has no mileage logs
+* **When** a maintenance user posts mileage 2000000
+* **Then** the response is 201 with mileage 2000000
+
+#### Scenario: Mileage above the maximum is rejected
+* **Given** vehicle id 3 exists
+* **When** a mileage log is posted with mileage 2000001
+* **Then** the response is 400 with message Invalid mileage data.
+
+#### Scenario: String mileage is rejected
+* **Given** vehicle id 3 exists
+* **When** a mileage log is posted with mileage as the string 100
+* **Then** the response is 400 with message Invalid mileage data.
+
 #### Scenario: Invalid mileage data is rejected
 * **Given** vehicle id 3 exists
 * **When** a mileage log is posted with a missing date, negative mileage, or non-integer mileage
@@ -296,6 +357,11 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **When** GET /vehicle-t6/vehicles/3/mileage-logs is sent
 * **Then** the response is 200 with logs sorted by logDate descending, then id descending
 
+#### Scenario: Mileage logs on the same date sort by id descending
+* **Given** vehicle id 3 has two mileage logs on the same date
+* **When** GET /vehicle-t6/vehicles/3/mileage-logs is sent
+* **Then** the higher id appears before the lower id
+
 #### Scenario: Add mileage opens the specified form
 * **Given** a maintenance user is on a vehicle log page
 * **When** the user selects Add mileage
@@ -310,6 +376,16 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **Given** Save is pressed and the API returns an error message or no message
 * **When** the create request finishes
 * **Then** the dialog stays open with the entered values and shows the API message or Mileage could not be saved.
+
+#### Scenario: Vehicle log page distinguishes mileage loading empty and failed states
+* **Given** mileage list is pending, then succeeds with [], or fails
+* **When** the vehicle log page renders each state
+* **Then** progress appears while pending, No mileage logs found. only after success, and failures show the API message or Mileage could not be loaded.
+
+#### Scenario: Mileage dialog rejects out of range values
+* **Given** the Add mileage dialog is open
+* **When** the user enters mileage above 2000000 and selects Save
+* **Then** the dialog stays open and create is not called
 
 ### US-12.3 — Log a vehicle service
 
@@ -333,15 +409,35 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **When** a service log is created with note made of only spaces
 * **Then** the saved note is null
 
+#### Scenario: Service note is trimmed
+* **Given** vehicle id 3 exists
+* **When** a service log is created with note padded by outer spaces
+* **Then** the saved note is the trimmed text
+
+#### Scenario: Oversized service note is rejected
+* **Given** vehicle id 3 exists
+* **When** a service log is posted with a note longer than 1000 characters after trim
+* **Then** the response is 400 with message Invalid service log data.
+
 #### Scenario: Unknown service type is rejected
 * **Given** vehicle id 3 exists
 * **When** a service log is posted with serviceType wash
 * **Then** the response is 400 with message Invalid service log data. and no log is stored
 
+#### Scenario: Invalid service date is rejected
+* **Given** vehicle id 3 exists
+* **When** a service log is posted with serviceDate 2026-13-01
+* **Then** the response is 400 with message Invalid service log data.
+
 #### Scenario: Service logs list newest first
 * **Given** vehicle id 3 has two service logs on different dates
 * **When** GET /vehicle-t6/vehicles/3/service-logs is sent
 * **Then** the response is 200 with logs sorted by serviceDate descending, then id descending
+
+#### Scenario: Service logs on the same date sort by id descending
+* **Given** vehicle id 3 has two service logs on the same date
+* **When** GET /vehicle-t6/vehicles/3/service-logs is sent
+* **Then** the higher id appears before the lower id
 
 #### Scenario: Add service opens the specified form
 * **Given** a maintenance user is on a vehicle log page
@@ -357,6 +453,16 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **Given** Save is pressed and the API returns an error message or no message
 * **When** the create request finishes
 * **Then** the dialog stays open with the entered values and shows the API message or Service log could not be saved.
+
+#### Scenario: Vehicle log page distinguishes service loading empty and failed states
+* **Given** service list is pending, then succeeds with [], or fails
+* **When** the vehicle log page renders each state
+* **Then** progress appears while pending, No service logs found. only after success, and failures show the API message or Service logs could not be loaded.
+
+#### Scenario: Service dialog rejects an oversized note
+* **Given** the Add service dialog is open
+* **When** the user enters a note longer than 1000 characters and selects Save
+* **Then** the dialog stays open and create is not called
 
 ### US-12.4 — Restrict mileage and service log access
 
@@ -384,6 +490,11 @@ Register MileageLog and ServiceLog belongsTo Vehicle and belongsTo User as logge
 * **Given** an admin is signed in
 * **When** a mileage or service route is called with vehicle id abc, 0, -1, or an unsafe integer
 * **Then** each response is 400 with message Vehicle id must be a positive integer.
+
+#### Scenario: Mileage and service storage failures return a safe error
+* **Given** an admin is signed in
+* **When** mileage or service-log database reads fail
+* **Then** each response is 500 with Mileage request failed. or Service log request failed. and no SQL details
 
 #### Scenario: Referenced vehicle cannot be deleted while logs exist
 * **Given** vehicle id 3 has a mileage log or a service log
@@ -414,33 +525,55 @@ Exact `it(...)` titles. Backend file: `backend/tests/maintenanceLogs.test.js`. F
 | US-12.1 | Maintenance lists every vehicle for logging | `backend/tests/maintenanceLogs.test.js` | `it("Maintenance lists every vehicle for logging")` |
 | US-12.1 | Admin lists every vehicle for logging | `backend/tests/maintenanceLogs.test.js` | `it("Admin lists every vehicle for logging")` |
 | US-12.1 | Empty maintenance vehicle list is returned | `backend/tests/maintenanceLogs.test.js` | `it("Empty maintenance vehicle list is returned")` |
+| US-12.1 | Maintenance vehicles sort by make model then id | `backend/tests/maintenanceLogs.test.js` | `it("Maintenance vehicles sort by make model then id")` |
 | US-12.1 | Maintenance page shows vehicle rows | `frontend/tests/MaintenanceLogs.test.js` | `it("Maintenance page shows vehicle rows")` |
 | US-12.1 | Maintenance page distinguishes loading empty and failed states | `frontend/tests/MaintenanceLogs.test.js` | `it("Maintenance page distinguishes loading empty and failed states")` |
 | US-12.1 | Maintenance vehicle list failure does not show empty | `frontend/tests/MaintenanceLogs.test.js` | `it("Maintenance vehicle list failure does not show empty")` |
+| US-12.1 | Choosing a vehicle opens its log page | `frontend/tests/MaintenanceLogs.test.js` | `it("Choosing a vehicle opens its log page")` |
 | US-12.2 | Maintenance creates a mileage log | `backend/tests/maintenanceLogs.test.js` | `it("Maintenance creates a mileage log")` |
 | US-12.2 | First mileage log accepts any reading in range | `backend/tests/maintenanceLogs.test.js` | `it("First mileage log accepts any reading in range")` |
 | US-12.2 | Mileage equal to the latest reading is allowed | `backend/tests/maintenanceLogs.test.js` | `it("Mileage equal to the latest reading is allowed")` |
 | US-12.2 | Mileage lower than the latest reading is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Mileage lower than the latest reading is rejected")` |
+| US-12.2 | Backdated mileage fits between neighboring readings | `backend/tests/maintenanceLogs.test.js` | `it("Backdated mileage fits between neighboring readings")` |
+| US-12.2 | Backdated mileage above the next reading is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Backdated mileage above the next reading is rejected")` |
+| US-12.2 | Same-day mileage lower than an existing reading is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Same-day mileage lower than an existing reading is rejected")` |
+| US-12.2 | Backdated mileage equal to the next reading is allowed | `backend/tests/maintenanceLogs.test.js` | `it("Backdated mileage equal to the next reading is allowed")` |
+| US-12.2 | Previous mileage neighbor uses logDate not id | `backend/tests/maintenanceLogs.test.js` | `it("Previous mileage neighbor uses logDate not id")` |
+| US-12.2 | Next mileage neighbor is the earliest later reading | `backend/tests/maintenanceLogs.test.js` | `it("Next mileage neighbor is the earliest later reading")` |
+| US-12.2 | Latest mileage for ordering uses logDate then id | `backend/tests/maintenanceLogs.test.js` | `it("Latest mileage for ordering uses logDate then id")` |
+| US-12.2 | Mileage at the maximum is accepted | `backend/tests/maintenanceLogs.test.js` | `it("Mileage at the maximum is accepted")` |
+| US-12.2 | Mileage above the maximum is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Mileage above the maximum is rejected")` |
+| US-12.2 | String mileage is rejected | `backend/tests/maintenanceLogs.test.js` | `it("String mileage is rejected")` |
 | US-12.2 | Invalid mileage data is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Invalid mileage data is rejected")` |
 | US-12.2 | Client cannot choose the logger | `backend/tests/maintenanceLogs.test.js` | `it("Client cannot choose the logger")` |
 | US-12.2 | Mileage logs list newest first | `backend/tests/maintenanceLogs.test.js` | `it("Mileage logs list newest first")` |
+| US-12.2 | Mileage logs on the same date sort by id descending | `backend/tests/maintenanceLogs.test.js` | `it("Mileage logs on the same date sort by id descending")` |
 | US-12.2 | Add mileage opens the specified form | `frontend/tests/MaintenanceLogs.test.js` | `it("Add mileage opens the specified form")` |
 | US-12.2 | Saving mileage refreshes the list | `frontend/tests/MaintenanceLogs.test.js` | `it("Saving mileage refreshes the list")` |
 | US-12.2 | Failed mileage save keeps the dialog open | `frontend/tests/MaintenanceLogs.test.js` | `it("Failed mileage save keeps the dialog open")` |
+| US-12.2 | Vehicle log page distinguishes mileage loading empty and failed states | `frontend/tests/MaintenanceLogs.test.js` | `it("Vehicle log page distinguishes mileage loading empty and failed states")` |
+| US-12.2 | Mileage dialog rejects out of range values | `frontend/tests/MaintenanceLogs.test.js` | `it("Mileage dialog rejects out of range values")` |
 | US-12.3 | Maintenance creates an oil change service log | `backend/tests/maintenanceLogs.test.js` | `it("Maintenance creates an oil change service log")` |
 | US-12.3 | Repair and tire replacement service types are accepted | `backend/tests/maintenanceLogs.test.js` | `it("Repair and tire replacement service types are accepted")` |
 | US-12.3 | Optional service note may be omitted | `backend/tests/maintenanceLogs.test.js` | `it("Optional service note may be omitted")` |
 | US-12.3 | Blank service note is stored as null | `backend/tests/maintenanceLogs.test.js` | `it("Blank service note is stored as null")` |
+| US-12.3 | Service note is trimmed | `backend/tests/maintenanceLogs.test.js` | `it("Service note is trimmed")` |
+| US-12.3 | Oversized service note is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Oversized service note is rejected")` |
 | US-12.3 | Unknown service type is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Unknown service type is rejected")` |
+| US-12.3 | Invalid service date is rejected | `backend/tests/maintenanceLogs.test.js` | `it("Invalid service date is rejected")` |
 | US-12.3 | Service logs list newest first | `backend/tests/maintenanceLogs.test.js` | `it("Service logs list newest first")` |
+| US-12.3 | Service logs on the same date sort by id descending | `backend/tests/maintenanceLogs.test.js` | `it("Service logs on the same date sort by id descending")` |
 | US-12.3 | Add service opens the specified form | `frontend/tests/MaintenanceLogs.test.js` | `it("Add service opens the specified form")` |
 | US-12.3 | Saving a service log refreshes the list | `frontend/tests/MaintenanceLogs.test.js` | `it("Saving a service log refreshes the list")` |
 | US-12.3 | Failed service save keeps the dialog open | `frontend/tests/MaintenanceLogs.test.js` | `it("Failed service save keeps the dialog open")` |
+| US-12.3 | Vehicle log page distinguishes service loading empty and failed states | `frontend/tests/MaintenanceLogs.test.js` | `it("Vehicle log page distinguishes service loading empty and failed states")` |
+| US-12.3 | Service dialog rejects an oversized note | `frontend/tests/MaintenanceLogs.test.js` | `it("Service dialog rejects an oversized note")` |
 | US-12.4 | Maintenance log APIs require a session | `backend/tests/maintenanceLogs.test.js` | `it("Maintenance log APIs require a session")` |
 | US-12.4 | Requestor cannot use maintenance logging | `backend/tests/maintenanceLogs.test.js` | `it("Requestor cannot use maintenance logging")` |
 | US-12.4 | Area admin cannot use maintenance logging | `backend/tests/maintenanceLogs.test.js` | `it("Area admin cannot use maintenance logging")` |
 | US-12.4 | Missing vehicle is rejected for logs | `backend/tests/maintenanceLogs.test.js` | `it("Missing vehicle is rejected for logs")` |
 | US-12.4 | Invalid vehicle id is rejected for logs | `backend/tests/maintenanceLogs.test.js` | `it("Invalid vehicle id is rejected for logs")` |
+| US-12.4 | Mileage and service storage failures return a safe error | `backend/tests/maintenanceLogs.test.js` | `it("Mileage and service storage failures return a safe error")` |
 | US-12.4 | Referenced vehicle cannot be deleted while logs exist | `backend/tests/maintenanceLogs.test.js` | `it("Referenced vehicle cannot be deleted while logs exist")` |
 | US-12.4 | Referenced logger user cannot be deleted while in use | `backend/tests/maintenanceLogs.test.js` | `it("Referenced logger user cannot be deleted while in use")` |
 | US-12.4 | Maintenance navigation requires an allowed role | `frontend/tests/MaintenanceLogs.test.js` | `it("Maintenance navigation requires an allowed role")` |
@@ -464,15 +597,15 @@ Do not implement behavior not in this spec.
 
 ## Definition of Done
 
-* [ ] Backend and frontend implemented per this spec (**FR-001**–**FR-016** satisfied)
-* [ ] **Success Criteria (SC-001**–**SC-005)** met
-* [ ] All mapped tests pass (`npm test`)
-* [ ] Test Coverage Map complete
-* [ ] `features/reference/data-model.md` updated (if schema changed)
-* [ ] `features/reference/api.md` updated (if API changed)
-* [ ] `features/reference/behavior.md` updated (if product rules changed)
-* [ ] Agility stories and acceptance tests for Feature 12 are created or updated
-* [ ] Application code for this feature is handwritten; automated tests may use AI assistance
+* [x] Backend and frontend implemented per this spec (**FR-001**–**FR-016** satisfied)
+* [x] **Success Criteria (SC-001**–**SC-005)** met
+* [x] All mapped tests pass (`npm test`)
+* [x] Test Coverage Map complete
+* [x] `features/reference/data-model.md` updated (if schema changed)
+* [x] `features/reference/api.md` updated (if API changed)
+* [x] `features/reference/behavior.md` updated (if product rules changed)
+* [x] Agility stories and acceptance tests for Feature 12 are created or updated
+* [x] Application code for this feature is handwritten; automated tests may use AI assistance
 
 ## Out of Scope
 
