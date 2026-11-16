@@ -24,6 +24,8 @@ jobs:
           node-version: 24
 
       - name: Install and build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
         run: |
           npm install
           npm run build
@@ -52,6 +54,13 @@ jobs:
       PORT: ${{ secrets.PORT }}
       NODE_ENV: production
       SEQUELIZE_SYNC_ALTER: ${{ secrets.SEQUELIZE_SYNC_ALTER }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
 
     defaults:
       run:
@@ -78,6 +87,13 @@ jobs:
           echo PORT="$PORT" >> .env
           echo NODE_ENV="$NODE_ENV" >> .env
           echo SEQUELIZE_SYNC_ALTER="$SEQUELIZE_SYNC_ALTER" >> .env
+          echo GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" >> .env
+          echo SMTP_HOST="$SMTP_HOST" >> .env
+          echo SMTP_PORT="$SMTP_PORT" >> .env
+          echo SMTP_SECURE="$SMTP_SECURE" >> .env
+          echo SMTP_FROM="$SMTP_FROM" >> .env
+          echo SMTP_USER="$SMTP_USER" >> .env
+          echo SMTP_PASSWORD="$SMTP_PASSWORD" >> .env
 
       - name: Bundle deploy folder
         run: npm run bundle
@@ -104,4 +120,5 @@ jobs:
             sudo systemctl stop vehicle-t6-backend
             sudo cp vehicle-t6-backend.service /lib/systemd/system/vehicle-t6-backend.service
             sudo systemctl daemon-reload
+            sudo systemctl enable vehicle-t6-backend
             sudo systemctl start vehicle-t6-backend

@@ -1,0 +1,13 @@
+[Unit]
+Description=NodeJS Vehicle Reservation App (team 6)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nodeapps/2026/project4/t6/
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
