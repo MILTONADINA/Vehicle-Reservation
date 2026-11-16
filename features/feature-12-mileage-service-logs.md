@@ -2,7 +2,7 @@
 
 **Feature ID:** 12  
 **Branch pattern:** `feature/12-mileage-service-logs`  
-**Status:** Implemented  
+**Status:** Shipped  
 **Created:** 2026-10-28  
 **Input:** Let maintenance staff (and admins) see the vehicle list, log mileage with a date and odometer reading, and log services such as repair, oil change, or tire replacement.  
 **Depends on:** [Feature 1 — User Authentication & Authorization](feature-1-user-authentication-authorization.md), [Feature 4 — Vehicle Management](feature-4-vehicle-management.md)
