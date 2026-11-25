@@ -2,6 +2,8 @@
 
 OC vehicle reservation system, built with Spec-Driven Development (SDD).
 
+**Live site:** https://project4.eaglesoftwareteam.com/seiv2026/p4/t6/
+
 Specifications define *what* to build (`features/`). Cursor rules define *how* (`.cursor/rules/`). Tests verify both.
 
 Features, their owners, and their reviewers are listed in [features/README.md](features/README.md).

@@ -1,6 +1,4 @@
 import { createVuetify } from "vuetify";
-import * as components from "vuetify/components";
-import * as directives from "vuetify/directives";
 import { loadFonts } from "./webfontloader.js";
 
 loadFonts();
@@ -36,9 +34,8 @@ const ocAcademic = {
   },
 };
 
+// Components and directives are imported per use by vite-plugin-vuetify (autoImport).
 const vuetify = createVuetify({
-  components,
-  directives,
   theme: {
     defaultTheme: "ocAcademic",
     themes: { ocAcademic },
