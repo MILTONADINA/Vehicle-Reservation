@@ -11,6 +11,7 @@ import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import path from "path";
 import app from "../server.js";
+import routes from "../app/routes/index.js";
 import db from "../app/models/index.js";
 import logger from "../app/config/logger.js";
 import authConfig from "../app/config/auth.config.js";
@@ -38,7 +39,7 @@ const account = { userId: expect.any(Number), email: "avery.reed@oc.edu", firstN
 // Test-only routes exercise the role guard without adding product endpoints.
 let protectedOperationRan = false;
 for (const role of roles) {
-  app.get(`/vehicle-t6/test-only/${role}`, authenticate, requireRole(role), (req, res) => {
+  routes.get(`/test-only/${role}`, authenticate, requireRole(role), (req, res) => {
     protectedOperationRan = true;
     res.send({ user: req.user });
   });
