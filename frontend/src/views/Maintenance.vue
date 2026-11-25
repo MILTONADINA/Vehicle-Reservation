@@ -66,7 +66,12 @@ function openVehicle(vehicle) {
           :key="vehicle.id"
           data-testid="maintenance-vehicle-row"
           class="cursor-pointer"
+          tabindex="0"
+          role="link"
+          :aria-label="`Open logs for ${vehicle.make} ${vehicle.model} ${vehicle.plateNumber}`"
           @click="openVehicle(vehicle)"
+          @keydown.enter.prevent="openVehicle(vehicle)"
+          @keydown.space.prevent="openVehicle(vehicle)"
         >
           <td data-testid="vehicle-make">{{ vehicle.make }}</td>
           <td data-testid="vehicle-model">{{ vehicle.model }}</td>
