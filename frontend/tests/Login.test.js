@@ -216,9 +216,10 @@ describe("Feature 1 — User Authentication & Authorization", () => {
       // A check that settles after the user has signed out must not resurrect the session.
       let settleLate;
       AuthServices.me.mockReturnValue(new Promise((resolve) => { settleLate = resolve; }));
-      await router.push("/login");
-      await router.push("/");
+      // A signed-in visit to /login now redirects Home, so a query change starts the new check.
+      await router.push("/?recheck=1");
       await flushPromises();
+      expect(AuthServices.me).toHaveBeenCalledTimes(2);
       AuthServices.logoutUser.mockResolvedValue({ data: { message: "Signed out." } });
       await wrapper.find('[data-testid="sign-out"]').trigger("click");
       await flushPromises();
@@ -271,6 +272,14 @@ describe("Feature 1 — User Authentication & Authorization", () => {
       await flushPromises();
       expect(wrapper.text()).not.toContain("Session could not be checked.");
       expect(wrapper.find("h1").text()).toBe("Sign in");
+    });
+
+    it("Signed-in visit to Sign in opens Home", async () => {
+      const wrapper = await mountSignedIn();
+      await router.push("/login");
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(homeHeading(wrapper).exists()).toBe(true);
     });
 
     it("Signed-out navigation opens Sign in", async () => {
@@ -344,6 +353,45 @@ describe("Feature 1 — User Authentication & Authorization", () => {
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("login");
       expect(forbiddenAlert(wrapper).exists()).toBe(false);
+    });
+  });
+
+  describe("MenuBar navigation", () => {
+    it("Wide screens show Home and the role links in the bar", async () => {
+      const wrapper = await mountSignedIn();
+      expect(wrapper.find('[data-testid="nav-menu"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="nav-home"]').text()).toBe("Home");
+      expect(wrapper.find('[data-testid="nav-requests"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="nav-users"]').exists()).toBe(false);
+    });
+
+    it("Narrow screens move the links and Sign out into a drawer", async () => {
+      const wideWidth = window.innerWidth;
+      window.innerWidth = 600;
+      window.dispatchEvent(new Event("resize"));
+      try {
+        const wrapper = await mountSignedIn();
+        const menu = wrapper.find('[data-testid="nav-menu"]');
+        expect(menu.exists()).toBe(true);
+        await menu.trigger("click");
+        await flushPromises();
+        const drawer = wrapper.find('[data-testid="nav-drawer"]');
+        expect(drawer.exists()).toBe(true);
+        expect(drawer.find('[data-testid="nav-home"]').exists()).toBe(true);
+        expect(drawer.find('[data-testid="nav-requests"]').exists()).toBe(true);
+        expect(drawer.find('[data-testid="nav-users"]').exists()).toBe(false);
+        expect(drawer.find('[data-testid="signed-in-email"]').text()).toContain("avery.reed@oc.edu");
+
+        AuthServices.logoutUser.mockResolvedValue({ data: { message: "Signed out." } });
+        await drawer.find('[data-testid="sign-out"]').trigger("click");
+        await flushPromises();
+        expect(Utils.getStore("user")).toBeNull();
+        expect(router.currentRoute.value.name).toBe("login");
+      } finally {
+        window.innerWidth = wideWidth;
+        window.dispatchEvent(new Event("resize"));
+        await flushPromises();
+      }
     });
   });
 
