@@ -249,12 +249,19 @@ controller.update = async (req, res) => {
     const result = await validateWritableFields(req.body);
     if (result.error) return res.status(result.status).send({ message: result.message });
 
-    const request = await db.reservationRequest.findOne({
-      where: { id, requestorUserId: req.user.id, status: "requested" },
+    // Lock the row so an admin status change cannot land between the status check and the edit.
+    const request = await db.sequelize.transaction(async (t) => {
+      const locked = await db.reservationRequest.findOne({
+        where: { id, requestorUserId: req.user.id },
+        lock: t.LOCK.UPDATE,
+        transaction: t,
+      });
+      if (!locked || locked.status !== "requested") return null;
+      await locked.update(result, { transaction: t });
+      return locked;
     });
     if (!request) return notFound(res, id);
 
-    await request.update(result);
     return res.status(200).send(requestPayload(request));
   } catch (error) {
     return failed(res, "update", error);
@@ -404,8 +411,17 @@ controller.changeStatus = async (req, res) => {
     let vehicleId = null;
     let statusReason = null;
 
+    // Cancel ignores vehicleId (it is always cleared); the other targets validate it (FR-006, FR-014).
+    const rawVehicleId = req.body?.vehicleId;
+    const hasVehicleId = rawVehicleId !== null && rawVehicleId !== undefined;
+    if (newStatus !== "cancelled" && hasVehicleId && parsePositiveInt(rawVehicleId) === null) {
+      return res.status(400).send({ message: "Vehicle id must be a positive integer." });
+    }
+    if ((newStatus === "awaiting_vehicle" || newStatus === "returned") && hasVehicleId) {
+      return res.status(400).send({ message: "Invalid reservation request data." });
+    }
+
     if (newStatus === "reserved") {
-      const rawVehicleId = req.body?.vehicleId;
       vehicleId = parsePositiveInt(rawVehicleId);
       if (vehicleId === null) {
         return res.status(400).send({ message: "Invalid reservation request data." });
