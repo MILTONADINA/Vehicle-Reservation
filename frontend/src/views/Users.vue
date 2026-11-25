@@ -9,6 +9,8 @@ const LIMITS = { email: 254, name: 100 };
 const ROLES = ["admin", "area_admin", "requestor", "maintenance"];
 const ORDINARY_ROLES = ["requestor", "maintenance"];
 const PRIVILEGED_ROLES = ["admin", "area_admin"];
+const ROLE_LABELS = { admin: "Admin", area_admin: "Area Admin", requestor: "Requestor", maintenance: "Maintenance" };
+const roleLabel = (role) => ROLE_LABELS[role] || role;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+$/;
 
 const user = ref(Utils.getStore("user"));
@@ -81,6 +83,7 @@ const dialog = reactive({ open: false, editing: null, saving: false, error: "", 
 const formRef = ref(null);
 
 const roleOptions = computed(() => (isAdmin.value ? ROLES : ORDINARY_ROLES));
+const roleItems = computed(() => roleOptions.value.map((role) => ({ title: roleLabel(role), value: role })));
 const areaOptions = computed(() => areas.value.map((area) => ({ title: area.areaName, value: area.id })));
 // Only an admin assigns areas, and only to an area admin; every other role is Unassigned.
 const areaEnabled = computed(() => isAdmin.value && dialog.form.role === "area_admin");
@@ -221,7 +224,7 @@ async function confirmDelete() {
           <td>{{ record.email }}</td>
           <td>{{ record.firstName }}</td>
           <td>{{ record.lastName }}</td>
-          <td>{{ record.role }}</td>
+          <td>{{ roleLabel(record.role) }}</td>
           <td>{{ areaLabel(record.areaId) }}</td>
           <td>
             <v-btn v-if="canManage(record)" size="small" variant="text" color="primary" :disabled="writesBlocked" data-testid="edit-user" @click="openEdit(record)">Edit</v-btn>
@@ -239,7 +242,7 @@ async function confirmDelete() {
           <v-text-field v-model="dialog.form.email" label="Email" type="email" :rules="rules.email" :maxlength="LIMITS.email" :readonly="dialog.editing !== null" data-testid="user-email" />
           <v-text-field v-model="dialog.form.firstName" label="First name" :rules="rules.firstName" :maxlength="LIMITS.name" data-testid="user-first" />
           <v-text-field v-model="dialog.form.lastName" label="Last name" :rules="rules.lastName" :maxlength="LIMITS.name" data-testid="user-last" />
-          <v-select :model-value="dialog.form.role" label="Role" :items="roleOptions" :rules="rules.role" :disabled="roleLocked" data-testid="user-role" @update:model-value="setRole" />
+          <v-select :model-value="dialog.form.role" label="Role" :items="roleItems" :rules="rules.role" :disabled="roleLocked" data-testid="user-role" @update:model-value="setRole" />
           <v-select
             v-model="dialog.form.areaId"
             label="Area"

@@ -13,6 +13,12 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MILES_PATTERN = /^\d+(\.\d)?$/;
 const NOTE_TYPES = ["general", "special_instructions", "other"];
 const NOTE_TYPE_SET = new Set(NOTE_TYPES);
+const NOTE_TYPE_LABELS = {
+  general: "General",
+  special_instructions: "Special instructions",
+  other: "Other",
+};
+const NOTE_TYPE_OPTIONS = NOTE_TYPES.map((value) => ({ title: NOTE_TYPE_LABELS[value], value }));
 const ISSUE_TYPES = [
   { title: "Low gas", value: "low_gas" },
   { title: "Dirty", value: "dirty" },
@@ -97,6 +103,7 @@ const destinations = ref([]);
 const loading = ref(false);
 const loaded = ref(false);
 const loadError = ref("");
+const catalogError = ref("");
 
 const areaMap = computed(() => {
   const map = {};
@@ -145,7 +152,11 @@ function displayDriver(req) {
 
 function displayNotes(req) {
   if (!req.noteType) return "";
-  return `${req.noteType}: ${req.noteText}`;
+  return `${NOTE_TYPE_LABELS[req.noteType] || req.noteType}: ${req.noteText}`;
+}
+
+function displayStatus(req) {
+  return STATUS_LABELS[req.status] || req.status;
 }
 
 function displayDeparture(req) {
@@ -159,6 +170,7 @@ function displayReturn(req) {
 async function load() {
   loading.value = true;
   loadError.value = "";
+  catalogError.value = "";
   try {
     // Load the request list on its own so a catalog failure cannot hide a successful list (FR-023).
     const reqResult = await ReservationRequestServices.getAll();
@@ -173,8 +185,9 @@ async function load() {
       areas.value = areaResult.data;
       drivers.value = driverResult.data;
       destinations.value = destResult.data;
-    } catch {
-      // Display names fall back to ids when catalogs cannot load.
+    } catch (reason) {
+      // The list stays visible; the alert explains why area, driver, or destination names are blank.
+      catalogError.value = reason.response?.data?.message || "Area, driver, and destination names could not be loaded.";
     }
   } catch (reason) {
     loadError.value = reason.response?.data?.message || "Reservation requests could not be loaded.";
@@ -397,6 +410,7 @@ async function confirmCancel() {
 
 const statusDialog = reactive({
   open: false,
+  markReturned: false,
   request: null,
   saving: false,
   error: "",
@@ -404,6 +418,7 @@ const statusDialog = reactive({
 });
 const candidateVehicles = ref([]);
 const loadingCandidates = ref(false);
+const candidatesLoaded = ref(false);
 
 const statusOptions = computed(() => {
   if (!statusDialog.request) return [];
@@ -414,6 +429,7 @@ const statusOptions = computed(() => {
 });
 
 function openStatusDialog(req) {
+  statusDialog.markReturned = false;
   statusDialog.request = req;
   statusDialog.error = "";
   statusDialog.saving = false;
@@ -425,6 +441,7 @@ function openStatusDialog(req) {
 }
 
 function openMarkReturned(req) {
+  statusDialog.markReturned = true;
   statusDialog.request = req;
   statusDialog.error = "";
   statusDialog.saving = false;
@@ -437,10 +454,12 @@ function openMarkReturned(req) {
 
 async function loadCandidates(requestId) {
   loadingCandidates.value = true;
+  candidatesLoaded.value = false;
   statusDialog.error = "";
   try {
     const result = await ReservationRequestServices.getCandidateVehicles(requestId);
     candidateVehicles.value = result.data;
+    candidatesLoaded.value = true;
   } catch (reason) {
     candidateVehicles.value = [];
     statusDialog.error = reason.response?.data?.message || "Candidate vehicles could not be loaded.";
@@ -456,9 +475,12 @@ watch(() => statusDialog.form.status, (newVal) => {
     loadCandidates(statusDialog.request.id);
   } else {
     candidateVehicles.value = [];
+    candidatesLoaded.value = false;
     statusDialog.form.vehicleId = null;
   }
 });
+
+const vehicleTitle = (v) => (v.plateNumber ? `${v.make} ${v.model} (${v.plateNumber})` : `${v.make} ${v.model}`);
 
 function cancelStatusDialog() {
   statusDialog.open = false;
@@ -552,13 +574,26 @@ async function loadRequestIssues(requestId) {
   }
 }
 
+const issuesSectionRef = ref(null);
+
 async function openRequestIssues(req) {
   if (!canViewRequestIssues(req)) return;
   selectedRequest.value = req;
   issuesLoaded.value = false;
   requestIssues.value = [];
+  // The panel renders below a possibly long table, so bring it into view when it opens.
+  await nextTick();
+  issuesSectionRef.value?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   await loadRequestIssues(req.id);
 }
+
+// Names the trip by destination and departure instead of its internal id.
+const selectedRequestLabel = computed(() => {
+  const req = selectedRequest.value;
+  if (!req) return "";
+  const destination = displayDestination(req);
+  return destination ? `${destination} on ${displayDeparture(req)}` : displayDeparture(req);
+});
 
 function reporterLabel(issue) {
   if (issue.reportedByUserId === user.value?.userId) {
@@ -658,6 +693,7 @@ async function saveIssue() {
       <v-alert v-if="sendNowState.error" type="error" density="compact" class="mb-4" data-testid="send-now-error">{{ sendNowState.error }}</v-alert>
     </template>
 
+    <v-alert v-if="catalogError" type="error" density="compact" class="mb-4" data-testid="requests-catalog-error">{{ catalogError }}</v-alert>
     <v-progress-circular v-if="loading" indeterminate color="primary" data-testid="requests-loading" />
     <v-alert v-else-if="loadError" type="error" density="compact" data-testid="requests-error">{{ loadError }}</v-alert>
     <p v-else-if="loaded && requests.length === 0" class="text-body-1" data-testid="requests-empty">No reservation requests found.</p>
@@ -691,7 +727,7 @@ async function saveIssue() {
           <td>{{ req.passengers }}</td>
           <td>{{ req.purpose }}</td>
           <td>{{ displayNotes(req) }}</td>
-          <td>{{ req.status }}</td>
+          <td>{{ displayStatus(req) }}</td>
           <td>{{ req.vehicleId }}</td>
           <td>{{ req.statusReason }}</td>
           <td>
@@ -705,9 +741,9 @@ async function saveIssue() {
       </tbody>
     </v-table>
 
-    <div v-if="selectedRequest" class="mt-8" data-testid="request-issues-section">
+    <div v-if="selectedRequest" ref="issuesSectionRef" class="mt-8" data-testid="request-issues-section">
       <div class="d-flex align-center justify-space-between mb-4">
-        <h2 class="text-h5">Issues for request {{ selectedRequest.id }}</h2>
+        <h2 class="text-h5" data-testid="request-issues-heading">Issues for {{ selectedRequestLabel }}</h2>
         <v-btn
           v-if="canReportIssue(selectedRequest)"
           color="primary"
@@ -791,7 +827,7 @@ async function saveIssue() {
           <v-select
             v-model="dialog.form.noteType"
             label="Note type"
-            :items="NOTE_TYPES"
+            :items="NOTE_TYPE_OPTIONS"
             clearable
             data-testid="request-note-type"
           />
@@ -818,7 +854,7 @@ async function saveIssue() {
 
     <v-dialog v-model="statusDialog.open" max-width="480" persistent>
       <v-card rounded="lg" class="pa-6" data-testid="status-dialog">
-        <h2 class="text-h6 mb-4">Change status</h2>
+        <h2 class="text-h6 mb-4" data-testid="status-dialog-title">{{ statusDialog.markReturned ? "Mark returned" : "Change status" }}</h2>
         <v-alert v-if="statusDialog.error" type="error" density="compact" class="mb-4" data-testid="status-form-error">{{ statusDialog.error }}</v-alert>
         <v-select
           v-model="statusDialog.form.status"
@@ -831,11 +867,16 @@ async function saveIssue() {
           v-model="statusDialog.form.vehicleId"
           label="Vehicle"
           :items="candidateVehicles"
-          :item-title="(v) => `${v.make} ${v.model}`"
+          :item-title="vehicleTitle"
           item-value="id"
           :loading="loadingCandidates"
           data-testid="status-vehicle"
         />
+        <p
+          v-if="statusDialog.form.status === 'reserved' && candidatesLoaded && candidateVehicles.length === 0"
+          class="text-body-2 mb-4"
+          data-testid="status-vehicle-empty"
+        >No vehicles available.</p>
         <v-textarea
           v-if="statusDialog.form.status === 'cancelled'"
           v-model="statusDialog.form.statusReason"
@@ -845,7 +886,7 @@ async function saveIssue() {
         />
         <div class="d-flex justify-end mt-4">
           <v-btn color="secondary" variant="text" class="mr-2" :disabled="statusDialog.saving" data-testid="cancel-status" @click="cancelStatusDialog">Cancel</v-btn>
-          <v-btn color="primary" variant="elevated" class="oc-cta" :loading="statusDialog.saving" :disabled="statusDialog.saving" data-testid="save-status" @click="saveStatus">Save</v-btn>
+          <v-btn color="primary" variant="elevated" class="oc-cta" :loading="statusDialog.saving" :disabled="statusDialog.saving || loadingCandidates" data-testid="save-status" @click="saveStatus">Save</v-btn>
         </div>
       </v-card>
     </v-dialog>

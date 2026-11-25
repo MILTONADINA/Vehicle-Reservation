@@ -234,6 +234,7 @@ describe("Feature 3 — User Management", () => {
       expect(bodyText()).toContain("Add user");
       for (const label of ["Email", "First name", "Last name", "Role", "Area"]) expect(bodyText()).toContain(label);
       expect(select(wrapper, "user-role").props("items").map((item) => item.value ?? item)).toEqual(["admin", "area_admin", "requestor", "maintenance"]);
+      expect(select(wrapper, "user-role").props("items").map((item) => item.title)).toEqual(["Admin", "Area Admin", "Requestor", "Maintenance"]);
       expect(select(wrapper, "user-area").props("disabled")).toBe(true);
       await choose(wrapper, "user-role", "area_admin");
       expect(select(wrapper, "user-area").props("disabled")).toBe(false);
@@ -400,7 +401,7 @@ describe("Feature 3 — User Management", () => {
       expect(dialogOpen("user-dialog")).toBe(false);
       expect(UserServices.getAll).toHaveBeenCalledTimes(2);
       expect(rowFor(wrapper, "req@oc.edu").text()).toContain("Renamed");
-      expect(rowFor(wrapper, "req@oc.edu").text()).toContain("maintenance");
+      expect(rowFor(wrapper, "req@oc.edu").text()).toContain("Maintenance");
     });
   });
 

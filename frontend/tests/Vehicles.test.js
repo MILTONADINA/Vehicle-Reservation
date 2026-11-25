@@ -160,6 +160,8 @@ describe("Feature 4 — Vehicle Management", () => {
       expect(rows(wrapper)[0].text()).toContain("Maintenance");
       expect(rows(wrapper)[1].text()).toContain("Ford");
       expect(rows(wrapper)[1].text()).toContain("Athletics");
+      expect(rows(wrapper)[0].text()).toContain("April");
+      expect(rows(wrapper)[1].text()).toContain("August");
       expect(wrapper.find('[data-testid="add-vehicle"]').exists()).toBe(true);
       expect(wrapper.findAll('[data-testid="edit-vehicle"]')).toHaveLength(2);
       expect(wrapper.findAll('[data-testid="delete-vehicle"]')).toHaveLength(2);
