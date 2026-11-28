@@ -516,8 +516,13 @@ describe("Feature 11 — Weekly Vehicle Schedule", () => {
 
   describe("US-11.4 — Restrict schedule and queue access", () => {
     it("Schedule and queue APIs require a session", async () => {
-      for (const pending of [getSchedule(), getQueue(), auth(request(app).get("/vehicle-t6/schedule"), "not-a-session")]) {
-        const response = await pending;
+      const attempts = [
+        () => getSchedule(),
+        () => getQueue(),
+        () => auth(request(app).get("/vehicle-t6/schedule"), "not-a-session"),
+      ];
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }

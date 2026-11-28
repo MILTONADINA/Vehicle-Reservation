@@ -434,13 +434,13 @@ describe("Feature 10 — Vehicle Issue Reports", () => {
       const before = await issueSnapshot();
 
       const attempts = [
-        createIssue(undefined, reservation.id, { issueType: "low_gas", timing: "after" }),
-        listForRequest(undefined, reservation.id),
-        listOpen(),
-        auth(request(app).get("/vehicle-t6/issues"), "not-a-session"),
+        () => createIssue(undefined, reservation.id, { issueType: "low_gas", timing: "after" }),
+        () => listForRequest(undefined, reservation.id),
+        () => listOpen(),
+        () => auth(request(app).get("/vehicle-t6/issues"), "not-a-session"),
       ];
-      for (const pending of attempts) {
-        const response = await pending;
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }

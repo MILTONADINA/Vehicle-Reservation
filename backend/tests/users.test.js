@@ -83,9 +83,14 @@ describe("Feature 3 — User Management", () => {
       for (const role of ["requestor", "maintenance"]) {
         const { user, token } = await signInAs(role);
         callers.push(user.id);
-        const attempts = [list(token), create(token, validNew), update(token, requestor.id, replacement), remove(token, requestor.id)];
-        for (const pending of attempts) {
-          const response = await pending;
+        const attempts = [
+          () => list(token),
+          () => create(token, validNew),
+          () => update(token, requestor.id, replacement),
+          () => remove(token, requestor.id),
+        ];
+        for (const attempt of attempts) {
+          const response = await attempt();
           expect(response.status).toBe(403);
           expect(response.body).toEqual({ message: "Forbidden." });
         }
@@ -97,8 +102,14 @@ describe("Feature 3 — User Management", () => {
     it("User endpoints require authentication", async () => {
       const { requestor } = await seed();
       const before = await snapshot();
-      for (const pending of [list(), create(undefined, validNew), update(undefined, requestor.id, replacement), remove(undefined, requestor.id)]) {
-        const response = await pending;
+      const attempts = [
+        () => list(),
+        () => create(undefined, validNew),
+        () => update(undefined, requestor.id, replacement),
+        () => remove(undefined, requestor.id),
+      ];
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }

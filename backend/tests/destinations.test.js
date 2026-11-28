@@ -118,15 +118,15 @@ describe("Feature 6 — Destination Management", () => {
       const destination = await db.destination.create(oklahoma);
       const before = await snapshot();
       const attempts = [
-        list(),
-        create(undefined, oklahoma),
-        update(undefined, destination.id, oklahoma),
-        remove(undefined, destination.id),
-        options(),
-        auth(request(app).get("/vehicle-t6/destinations"), "not-a-session"),
+        () => list(),
+        () => create(undefined, oklahoma),
+        () => update(undefined, destination.id, oklahoma),
+        () => remove(undefined, destination.id),
+        () => options(),
+        () => auth(request(app).get("/vehicle-t6/destinations"), "not-a-session"),
       ];
-      for (const pending of attempts) {
-        const response = await pending;
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }
