@@ -96,11 +96,14 @@ export function createAppRouter() {
   });
 
   // Signed-out visitors are sent to Sign in; the session itself is validated by SessionGate.
-  // A route limited to certain roles sends every other signed-in role Home.
+  // A route limited to certain roles sends every other signed-in role Home, and so does Sign in.
   router.beforeEach((to) => {
     const stored = Utils.getStore("user");
     if (to.meta.requiresAuth && !stored?.token) {
       return { name: "login" };
+    }
+    if (to.name === "login" && stored?.token) {
+      return { name: "home" };
     }
     if (to.meta.roles && !to.meta.roles.includes(stored?.role)) {
       return { name: "home" };

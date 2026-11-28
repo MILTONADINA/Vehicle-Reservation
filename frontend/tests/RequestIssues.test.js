@@ -157,6 +157,22 @@ describe("Feature 10 — Request Issues", () => {
       expect(byTestId("cancel-issue").textContent).toContain("Cancel");
     });
 
+    it("Issues panel names the trip and scrolls into view", async () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      try {
+        const wrapper = await openRequests("requestor");
+        await wrapper.find('[data-testid="view-issues"]').trigger("click");
+        await flushPromises();
+        const heading = wrapper.find('[data-testid="request-issues-heading"]').text();
+        expect(heading).toBe("Issues for Oklahoma City Airport on 2026-11-10 08:30");
+        expect(heading).not.toContain("request 10");
+        expect(scrollIntoView).toHaveBeenCalledOnce();
+      } finally {
+        delete Element.prototype.scrollIntoView;
+      }
+    });
+
     it("Saving an issue refreshes the list", async () => {
       const created = {
         id: 1,

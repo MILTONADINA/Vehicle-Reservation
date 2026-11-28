@@ -49,6 +49,7 @@ const weekStart = ref(mondayOf());
 const weekEnd = ref(addDays(weekStart.value, 6));
 const areaId = ref(null);
 const areas = ref([]);
+const areasError = ref("");
 
 const scheduleItems = ref([]);
 const scheduleLoading = ref(false);
@@ -63,51 +64,63 @@ const queueError = ref("");
 
 async function loadAreas() {
   if (!isAdmin.value) return;
+  areasError.value = "";
   try {
     const { data } = await AreaServices.getAll();
     areas.value = data;
-  } catch {
+  } catch (reason) {
     areas.value = [];
+    areasError.value = reason.response?.data?.message || "Area options could not be loaded.";
   }
 }
 
+// Each load takes a token; a response for an older week or filter is ignored.
+let scheduleToken = 0;
+let queueToken = 0;
+
 async function loadSchedule() {
   if (!canSeeSchedule.value) return;
+  const token = ++scheduleToken;
   scheduleLoading.value = true;
   scheduleError.value = "";
   try {
     const params = { weekStart: weekStart.value };
     if (isAdmin.value && areaId.value) params.areaId = areaId.value;
     const { data } = await ScheduleServices.getSchedule(params);
+    if (token !== scheduleToken) return;
     weekStart.value = data.weekStart;
     weekEnd.value = data.weekEnd;
     scheduleItems.value = data.items || [];
     scheduleLoaded.value = true;
   } catch (reason) {
+    if (token !== scheduleToken) return;
     scheduleItems.value = [];
     scheduleError.value = reason.response?.data?.message || "Schedule could not be loaded.";
   } finally {
-    scheduleLoading.value = false;
+    if (token === scheduleToken) scheduleLoading.value = false;
   }
 }
 
 async function loadQueue() {
   if (!canSeeSchedule.value) return;
+  const token = ++queueToken;
   queueLoading.value = true;
   queueError.value = "";
   try {
     const params = {};
     if (isAdmin.value && areaId.value) params.areaId = areaId.value;
     const { data } = await ScheduleServices.getServiceQueue(params);
+    if (token !== queueToken) return;
     needVehicle.value = data.needVehicle || [];
     needCheckIn.value = data.needCheckIn || [];
     queueLoaded.value = true;
   } catch (reason) {
+    if (token !== queueToken) return;
     needVehicle.value = [];
     needCheckIn.value = [];
     queueError.value = reason.response?.data?.message || "Service queue could not be loaded.";
   } finally {
-    queueLoading.value = false;
+    if (token === queueToken) queueLoading.value = false;
   }
 }
 
@@ -116,11 +129,13 @@ async function loadAll() {
 }
 
 function previousWeek() {
+  if (scheduleLoading.value) return;
   weekStart.value = addDays(weekStart.value, -7);
   loadSchedule();
 }
 
 function nextWeek() {
+  if (scheduleLoading.value) return;
   weekStart.value = addDays(weekStart.value, 7);
   loadSchedule();
 }
@@ -148,6 +163,7 @@ onMounted(async () => {
 <template>
   <v-container class="py-10">
     <h1 class="text-h4 mb-6">Schedule</h1>
+    <v-alert v-if="areasError" type="error" density="compact" class="mb-4" data-testid="schedule-areas-error">{{ areasError }}</v-alert>
 
     <section class="mb-10" data-testid="schedule-section">
       <div class="d-flex flex-wrap align-center justify-space-between ga-2 mb-4">
@@ -166,9 +182,9 @@ onMounted(async () => {
             style="min-width: 200px"
             data-testid="schedule-area-filter"
           />
-          <v-btn variant="outlined" data-testid="previous-week" @click="previousWeek">Previous week</v-btn>
+          <v-btn variant="outlined" :disabled="scheduleLoading" data-testid="previous-week" @click="previousWeek">Previous week</v-btn>
           <span class="text-body-1" data-testid="week-range">{{ weekStart }} – {{ weekEnd }}</span>
-          <v-btn variant="outlined" data-testid="next-week" @click="nextWeek">Next week</v-btn>
+          <v-btn variant="outlined" :disabled="scheduleLoading" data-testid="next-week" @click="nextWeek">Next week</v-btn>
         </div>
       </div>
 

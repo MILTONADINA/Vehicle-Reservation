@@ -45,6 +45,7 @@ const isCalendarDate = (value) => {
 };
 
 async function loadVehicleSummary() {
+  vehicle.value = null;
   vehicleError.value = "";
   try {
     const { data } = await MaintenanceLogServices.listVehicles();
@@ -85,7 +86,13 @@ async function loadServices() {
 
 async function loadAll() {
   if (!canSeeMaintenance.value) return;
+  mileageLogs.value = [];
+  serviceLogs.value = [];
+  mileageLoaded.value = false;
+  serviceLoaded.value = false;
   await loadVehicleSummary();
+  // Without a vehicle there is nothing to log against, so logs are not requested.
+  if (!vehicle.value) return;
   await Promise.all([loadMileage(), loadServices()]);
 }
 onMounted(loadAll);
@@ -195,7 +202,7 @@ async function saveService() {
     <h1 class="text-h4 mb-4" data-testid="maintenance-vehicle-heading">{{ heading }}</h1>
     <v-alert v-if="vehicleError" type="error" density="compact" class="mb-4" data-testid="maintenance-vehicle-error">{{ vehicleError }}</v-alert>
 
-    <section class="mb-8">
+    <section v-if="vehicle" class="mb-8">
       <div class="d-flex align-center justify-space-between mb-3">
         <h2 class="text-h5">Mileage</h2>
         <v-btn color="primary" data-testid="add-mileage" @click="openMileageDialog">Add mileage</v-btn>
@@ -221,7 +228,7 @@ async function saveService() {
       </v-table>
     </section>
 
-    <section>
+    <section v-if="vehicle">
       <div class="d-flex align-center justify-space-between mb-3">
         <h2 class="text-h5">Services</h2>
         <v-btn color="primary" data-testid="add-service" @click="openServiceDialog">Add service</v-btn>

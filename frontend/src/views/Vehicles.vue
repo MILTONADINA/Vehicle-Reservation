@@ -7,7 +7,9 @@ import Utils from "../config/utils.js";
 const LIMITS = { color: 40, plateNumber: 20, designatedParking: 200 };
 const VIN_PATTERN = /^[A-Z0-9]{1,17}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS = MONTH_NAMES.map((title, index) => ({ title, value: index + 1 }));
+const monthName = (month) => MONTH_NAMES[month - 1] || month;
 
 const user = ref(Utils.getStore("user"));
 const refreshUser = () => { user.value = Utils.getStore("user"); };
@@ -277,7 +279,7 @@ async function confirmDelete() {
           <td>{{ vehicle.color }}</td>
           <td>{{ vehicle.passengers }}</td>
           <td>{{ vehicle.plateNumber }}</td>
-          <td>{{ vehicle.plateExpireMonth }}</td>
+          <td>{{ monthName(vehicle.plateExpireMonth) }}</td>
           <td>{{ vehicle.designatedParking }}</td>
           <td>{{ areaName(vehicle.areaId) }}</td>
           <td>

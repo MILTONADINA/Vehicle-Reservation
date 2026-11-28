@@ -142,6 +142,15 @@ async function choose(id, value) {
 
 const rows = (wrapper) => wrapper.findAll('[data-testid="request-row"]');
 
+function selectProps(id) {
+  let instance = byTestId(id)?.__vueParentComponent;
+  while (instance) {
+    if (Array.isArray(instance.props?.items)) return instance.props;
+    instance = instance.parent;
+  }
+  throw new Error(`could not read select ${id}`);
+}
+
 beforeEach(async () => {
   localStorage.clear();
   vi.resetAllMocks();
@@ -186,9 +195,9 @@ describe("Feature 8 — Request Processing", () => {
     const allRows = rows(wrapper);
     expect(allRows).toHaveLength(2);
 
-    expect(allRows[0].text()).toContain("reserved");
+    expect(allRows[0].text()).toContain("Reserved");
     expect(allRows[0].text()).toContain("5");
-    expect(allRows[1].text()).toContain("cancelled");
+    expect(allRows[1].text()).toContain("Cancelled");
     expect(allRows[1].text()).toContain("No vehicle available.");
 
     expect(wrapper.findAll('[data-testid="status-change"]')).toHaveLength(0);
@@ -238,7 +247,7 @@ describe("Feature 8 — Request Processing", () => {
 
     expect(dialogOpen("status-dialog")).toBe(false);
     expect(ReservationRequestServices.getAll).toHaveBeenCalledTimes(2);
-    expect(rows(wrapper)[0].text()).toContain("awaiting_vehicle");
+    expect(rows(wrapper)[0].text()).toContain("Awaiting Vehicle");
   });
 
   it("Failed status change keeps the dialog open", async () => {
@@ -290,6 +299,67 @@ describe("Feature 8 — Request Processing", () => {
     expect(ReservationRequestServices.changeStatus).not.toHaveBeenCalled();
   });
 
+  it("Catalog load failure keeps the list and shows an error", async () => {
+    Utils.setStore("user", { ...account("admin"), token: "session-token" });
+    AuthServices.me.mockResolvedValue({ data: account("admin") });
+    mockLists([reqRequested]);
+    DriverServices.getAll.mockRejectedValueOnce(new Error("Network Error"));
+    const wrapper = await mountApp("/reservation-requests");
+
+    expect(rows(wrapper)).toHaveLength(1);
+    expect(wrapper.find('[data-testid="requests-catalog-error"]').text()).toBe("Area, driver, and destination names could not be loaded.");
+  });
+
+  it("Status column uses display labels", async () => {
+    const wrapper = await openRequests("admin", null, [reqRequested, reqReserved]);
+    expect(rows(wrapper)[0].text()).toContain("Requested");
+    expect(rows(wrapper)[1].text()).toContain("Reserved");
+    expect(wrapper.find('[data-testid="requests-catalog-error"]').exists()).toBe(false);
+  });
+
+  it("Mark returned opens a dialog titled Mark returned", async () => {
+    const wrapper = await openRequests("admin", null, [reqReserved]);
+    await rows(wrapper)[0].find('[data-testid="mark-returned"]').trigger("click");
+    await flushPromises();
+    expect(dialogOpen("status-dialog")).toBe(true);
+    expect(byTestId("status-dialog-title").textContent).toBe("Mark returned");
+    await click("cancel-status");
+
+    await rows(wrapper)[0].find('[data-testid="status-change"]').trigger("click");
+    await flushPromises();
+    expect(byTestId("status-dialog-title").textContent).toBe("Change status");
+  });
+
+  it("Reserve choices show plates and block Save while loading", async () => {
+    const wrapper = await openRequests("admin", null, [reqRequested]);
+    let resolveCandidates;
+    ReservationRequestServices.getCandidateVehicles.mockReturnValue(new Promise((resolve) => { resolveCandidates = resolve; }));
+
+    await rows(wrapper)[0].find('[data-testid="status-change"]').trigger("click");
+    await flushPromises();
+    await choose("status-select", "reserved");
+    expect(byTestId("save-status").disabled).toBe(true);
+    expect(byTestId("status-vehicle-empty")).toBeNull();
+
+    resolveCandidates({ data: [candidateVeh] });
+    await flushPromises();
+    expect(byTestId("save-status").disabled).toBe(false);
+    const props = selectProps("status-vehicle");
+    expect(props.itemTitle(props.items[0])).toBe("Ford Transit (ABC123)");
+    expect(byTestId("status-vehicle-empty")).toBeNull();
+  });
+
+  it("Reserve with no candidates says no vehicles are available", async () => {
+    const wrapper = await openRequests("admin", null, [reqRequested]);
+    ReservationRequestServices.getCandidateVehicles.mockResolvedValue({ data: [] });
+
+    await rows(wrapper)[0].find('[data-testid="status-change"]').trigger("click");
+    await flushPromises();
+    await choose("status-select", "reserved");
+    await flushPromises();
+    expect(byTestId("status-vehicle-empty").textContent).toBe("No vehicles available.");
+  });
+
   it("Candidate vehicle load failure shows an error", async () => {
     const wrapper = await openRequests("admin", null, [reqRequested]);
     ReservationRequestServices.getCandidateVehicles.mockRejectedValueOnce(apiError(500, "Reservation request failed."));
@@ -301,5 +371,6 @@ describe("Feature 8 — Request Processing", () => {
 
     expect(bodyText()).toContain("Reservation request failed.");
     expect(dialogOpen("status-dialog")).toBe(true);
+    expect(byTestId("status-vehicle-empty")).toBeNull();
   });
 });

@@ -208,6 +208,34 @@ describe("Feature 12 — Mileage & Service Logs", () => {
     });
   });
 
+  describe("Maintenance navigation", () => {
+    it("Vehicle rows open with the keyboard", async () => {
+      mockVehiclePage();
+      const wrapper = await openMaintenance("maintenance");
+      expect(rows(wrapper)[0].attributes("tabindex")).toBe("0");
+      await rows(wrapper)[0].trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("maintenance-vehicle");
+      await router.push("/maintenance");
+      await flushPromises();
+      await rows(wrapper)[1].trigger("keydown", { key: " " });
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe("maintenance-vehicle");
+    });
+
+    it("Unknown vehicle skips logs and hides Add actions", async () => {
+      Utils.setStore("user", { ...account("maintenance"), token: "session-token" });
+      AuthServices.me.mockResolvedValue({ data: account("maintenance") });
+      mockVehiclePage();
+      const wrapper = await mountApp("/maintenance/vehicles/999");
+      expect(wrapper.find('[data-testid="maintenance-vehicle-error"]').text()).toBe("Vehicle could not be loaded.");
+      expect(MaintenanceLogServices.listMileage).not.toHaveBeenCalled();
+      expect(MaintenanceLogServices.listService).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="add-mileage"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="add-service"]').exists()).toBe(false);
+    });
+  });
+
   describe("US-12.2 — Log vehicle mileage", () => {
     it("Add mileage opens the specified form", async () => {
       const wrapper = await openVehicleLogs();

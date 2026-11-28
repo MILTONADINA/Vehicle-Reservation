@@ -216,6 +216,44 @@ describe("Feature 11 — Schedule page", () => {
       expect(ScheduleServices.getSchedule).toHaveBeenCalledWith({ weekStart: "2026-11-02" });
     });
 
+    it("Week controls are disabled while loading and late responses are ignored", async () => {
+      const wrapper = await openSchedule("admin");
+      let resolveFirst;
+      ScheduleServices.getSchedule.mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }));
+      await wrapper.find('[data-testid="next-week"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-testid="next-week"]').attributes("disabled")).toBeDefined();
+      expect(wrapper.find('[data-testid="previous-week"]').attributes("disabled")).toBeDefined();
+      await wrapper.find('[data-testid="next-week"]').trigger("click");
+      expect(ScheduleServices.getSchedule).toHaveBeenCalledTimes(2);
+
+      // An area change starts a newer load; the older week response must not overwrite it.
+      let resolveSecond;
+      ScheduleServices.getSchedule.mockReturnValueOnce(new Promise((resolve) => { resolveSecond = resolve; }));
+      ScheduleServices.getServiceQueue.mockResolvedValue({ data: { needVehicle: [], needCheckIn: [] } });
+      let instance = wrapper.find('[data-testid="schedule-area-filter"]').element.__vueParentComponent;
+      while (instance && !("modelValue" in (instance.props || {}) && Array.isArray(instance.props.items))) instance = instance.parent;
+      instance.emit("update:modelValue", 1);
+      await flushPromises();
+      resolveSecond({ data: { weekStart: "2026-11-09", weekEnd: "2026-11-15", items: [] } });
+      await flushPromises();
+      resolveFirst({ data: { weekStart: "2026-11-09", weekEnd: "2026-11-15", items: [scheduleItem] } });
+      await flushPromises();
+      expect(wrapper.find('[data-testid="schedule-empty"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-testid="schedule-row"]')).toHaveLength(0);
+      expect(wrapper.find('[data-testid="next-week"]').attributes("disabled")).toBeUndefined();
+    });
+
+    it("Area option failure is shown to the admin", async () => {
+      Utils.setStore("user", { ...account("admin"), token: "session-token" });
+      AuthServices.me.mockResolvedValue({ data: account("admin") });
+      mockHappy();
+      AreaServices.getAll.mockRejectedValueOnce(new Error("Network Error"));
+      const wrapper = await mountApp("/schedule");
+      expect(wrapper.find('[data-testid="schedule-areas-error"]').text()).toBe("Area options could not be loaded.");
+      expect(wrapper.findAll('[data-testid="schedule-row"]').length).toBeGreaterThan(0);
+    });
+
     it("Admin area filter is sent with schedule and queue requests", async () => {
       const wrapper = await openSchedule("admin");
       expect(wrapper.find('[data-testid="schedule-area-filter"]').exists()).toBe(true);

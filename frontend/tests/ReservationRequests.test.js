@@ -191,9 +191,9 @@ describe("Feature 7 — Reservation Requests", () => {
       expect(rows(wrapper)[0].text()).toContain("120.5");
       expect(rows(wrapper)[0].text()).toContain("4");
       expect(rows(wrapper)[0].text()).toContain("Conference shuttle");
-      expect(rows(wrapper)[0].text()).toContain("special_instructions");
+      expect(rows(wrapper)[0].text()).toContain("Special instructions: Need wheelchair access");
       expect(rows(wrapper)[0].text()).toContain("Need wheelchair access");
-      expect(rows(wrapper)[0].text()).toContain("requested");
+      expect(rows(wrapper)[0].text()).toContain("Requested");
       expect(rows(wrapper)[1].text()).toContain("Norman");
       expect(rows(wrapper)[1].text()).toContain("40.5");
       expect(wrapper.find('[data-testid="add-request"]').exists()).toBe(true);
@@ -506,7 +506,7 @@ describe("Feature 7 — Reservation Requests", () => {
       await flushPromises();
       expect(dialogOpen("cancel-request-dialog")).toBe(false);
       expect(ReservationRequestServices.getAll).toHaveBeenCalledTimes(2);
-      expect(rows(wrapper)[0].text()).toContain("cancelled");
+      expect(rows(wrapper)[0].text()).toContain("Cancelled");
     });
 
     it("Failed reservation request cancel preserves the dialog and row", async () => {
