@@ -6,6 +6,7 @@
 
 - Flat JSON responses (no `{ success, data }` envelope).
 - Errors: `{ "message": "..." }`.
+- Unknown path under `/vehicle-t6` → `404` `Not found.`; malformed JSON body → `400` `Invalid JSON.`; any other unhandled error → `500` `Server error.`
 - Authenticated routes: `Authorization: Bearer <token>`, where the token is the application session JWT returned by login.
 - Any route behind `authenticate`: no valid session → `401` `Unauthorized.`; session lookup failure → `500` `Session could not be checked.`. Behind `requireRole(...)`: role not allowed → `403` `Forbidden.`
 
@@ -158,16 +159,16 @@ List scope: requestor sees only own requests; area_admin sees only requests for 
 
 Cancel uses the shared status-change function (Feature 8), so a requestor cancel also saves the Feature 9 status email. Cancel does not delete the row.
 
-Status-change body: `{ "status": "<next>", "vehicleId": <id>|null, "statusReason": "<text>"|null }`. Allowed transitions: `requested` → `awaiting_vehicle` / `reserved` / `cancelled`; `awaiting_vehicle` → `reserved` / `cancelled`; `reserved` → `returned` / `cancelled`. When status is `reserved`, `vehicleId` must be a valid candidate vehicle. When status is `cancelled`, optional `statusReason` (trimmed, ≤ 500 chars). Moving to `returned` keeps the existing `vehicleId`. Candidate vehicles must match the request's area, have passengers ≥ request passengers, and have no time overlap with another `reserved`/`returned` assignment.
+Status-change body: `{ "status": "<next>", "vehicleId": <id>|null, "statusReason": "<text>"|null }`. Allowed transitions: `requested` → `awaiting_vehicle` / `reserved` / `cancelled`; `awaiting_vehicle` → `reserved` / `cancelled`; `reserved` → `returned` / `cancelled`. When status is `reserved`, `vehicleId` must be a valid candidate vehicle. When status is `cancelled`, optional `statusReason` (trimmed, ≤ 500 chars). Moving to `awaiting_vehicle` or `returned` requires `vehicleId` omitted or null; `returned` keeps the existing `vehicleId`. Candidate vehicles must match the request's area, have passengers ≥ request passengers, and have no time overlap with another `reserved`/`returned` assignment.
 
 | Condition | Status | Message |
 |-----------|--------|---------|
 | No valid session | 401 | `Unauthorized.` |
 | Disallowed role or maintenance access | 403 | `Forbidden.` |
 | Invalid field, schedule, destination mode, notes, passengers, or purpose | 400 | `Invalid reservation request data.` |
-| Illegal transition, capacity/area/overlap failure | 400 | `Invalid reservation request data.` |
+| Illegal transition, capacity/area/overlap failure, or non-null `vehicleId` with `awaiting_vehicle`/`returned` | 400 | `Invalid reservation request data.` |
 | Route id not a positive safe integer | 400 | `Reservation request id must be a positive integer.` |
-| Invalid vehicle route id | 400 | `Vehicle id must be a positive integer.` |
+| Invalid vehicle route id, or status-change `vehicleId` that is not a positive integer | 400 | `Vehicle id must be a positive integer.` |
 | Missing area | 404 | `Area with id=<id> not found.` |
 | Missing driver | 404 | `Driver with id=<id> not found.` |
 | Missing destination | 404 | `Destination with id=<id> not found.` |

@@ -5,6 +5,7 @@
 import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../server.js";
+import routes from "../app/routes/index.js";
 import db from "../app/models/index.js";
 import { authenticate } from "../app/authorization/authorization.js";
 import { googleVerifier } from "../app/authorization/googleVerifier.js";
@@ -26,7 +27,7 @@ const update = (token, id, body) => auth(request(app).put(`/vehicle-t6/areas/${i
 const remove = (token, id) => auth(request(app).delete(`/vehicle-t6/areas/${id}`), token);
 
 // A test-only route exposing the authenticated request context.
-app.get("/vehicle-t6/test-only/context", authenticate, (req, res) => res.send(req.user));
+routes.get("/test-only/context", authenticate, (req, res) => res.send(req.user));
 
 const seedAreas = async () => {
   const first = await db.area.create(maintenance);

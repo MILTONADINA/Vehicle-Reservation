@@ -887,5 +887,56 @@ describe("Feature 8 — Request Processing", () => {
         expect(response.body).toEqual({ message: "Reservation request id must be a positive integer." });
       }
     });
+
+    it("Invalid vehicle id is rejected on reserve", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+      const r1 = await makeRequest({ requestorUserId: reqUser.id, areaId: area1.id, status: "requested" });
+
+      for (const vehicleId of ["abc", 0, -1, 1.5, "0", "1.5"]) {
+        const response = await changeStatus(adminToken, r1.id, { status: "reserved", vehicleId });
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ message: "Vehicle id must be a positive integer." });
+      }
+
+      const unchanged = await db.reservationRequest.findByPk(r1.id);
+      expect(unchanged.status).toBe("requested");
+      expect(unchanged.vehicleId).toBeNull();
+    });
+
+    it("Vehicle id is rejected when moving to awaiting vehicle or returned", async () => {
+      const { user: reqUser } = await signInAs("requestor");
+      const { token: adminToken } = await signInAs("admin");
+      const v12 = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      const v13 = await makeVehicle({ areaId: area1.id, passengers: 8 });
+      const requested = await makeRequest({ requestorUserId: reqUser.id, areaId: area1.id, status: "requested" });
+      const reserved = await makeRequest({
+        requestorUserId: reqUser.id,
+        areaId: area1.id,
+        status: "reserved",
+        vehicleId: v12.id,
+      });
+
+      const awaiting = await changeStatus(adminToken, requested.id, { status: "awaiting_vehicle", vehicleId: v12.id });
+      expect(awaiting.status).toBe(400);
+      expect(awaiting.body).toEqual({ message: "Invalid reservation request data." });
+
+      const returned = await changeStatus(adminToken, reserved.id, { status: "returned", vehicleId: v13.id });
+      expect(returned.status).toBe(400);
+      expect(returned.body).toEqual({ message: "Invalid reservation request data." });
+
+      const malformed = await changeStatus(adminToken, requested.id, { status: "awaiting_vehicle", vehicleId: "abc" });
+      expect(malformed.status).toBe(400);
+      expect(malformed.body).toEqual({ message: "Vehicle id must be a positive integer." });
+
+      expect((await db.reservationRequest.findByPk(requested.id)).status).toBe("requested");
+      const stillReserved = await db.reservationRequest.findByPk(reserved.id);
+      expect(stillReserved.status).toBe("reserved");
+      expect(stillReserved.vehicleId).toBe(v12.id);
+
+      const nullAccepted = await changeStatus(adminToken, requested.id, { status: "awaiting_vehicle", vehicleId: null });
+      expect(nullAccepted.status).toBe(200);
+      expect(nullAccepted.body.status).toBe("awaiting_vehicle");
+    });
   });
 });

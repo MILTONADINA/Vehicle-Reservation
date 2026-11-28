@@ -674,6 +674,50 @@ describe("Feature 7 — Reservation Requests", () => {
       expect(unchanged.status).toBe("cancelled");
     });
 
+    it("Requestor cannot update a reserved reservation request", async () => {
+      const { user, token } = await signInAs("requestor");
+      const req5 = await db.reservationRequest.create({
+        ...validCatalogBody(),
+        requestorUserId: user.id,
+        status: "reserved",
+      });
+
+      const response = await updateRequest(token, req5.id, validCatalogBody({ purpose: "Changed" }));
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ message: `Reservation request with id=${req5.id} not found.` });
+
+      const unchanged = await db.reservationRequest.findByPk(req5.id);
+      expect(unchanged.status).toBe("reserved");
+      expect(unchanged.purpose).not.toBe("Changed");
+    });
+
+    it("Requestor edit locks the request row in one transaction", async () => {
+      const { user, token } = await signInAs("requestor");
+      const req1 = await db.reservationRequest.create({
+        ...validCatalogBody(),
+        requestorUserId: user.id,
+        status: "requested",
+      });
+
+      const txnSpy = jest.spyOn(db.sequelize, "transaction");
+      const findSpy = jest.spyOn(db.reservationRequest, "findOne");
+
+      const response = await updateRequest(token, req1.id, validCatalogBody({ purpose: "Locked edit" }));
+
+      expect(response.status).toBe(200);
+      expect(response.body.purpose).toBe("Locked edit");
+      expect(txnSpy).toHaveBeenCalled();
+
+      const lockedCall = findSpy.mock.calls.find(
+        (call) => call[0]?.lock === db.Sequelize.Transaction.LOCK.UPDATE,
+      );
+      expect(lockedCall).toBeTruthy();
+      expect(lockedCall[0].transaction).toBeTruthy();
+
+      txnSpy.mockRestore();
+      findSpy.mockRestore();
+    });
+
     it("Admin and area admin cannot update a reservation request", async () => {
       const { user: reqUser } = await signInAs("requestor");
       const req1 = await db.reservationRequest.create({

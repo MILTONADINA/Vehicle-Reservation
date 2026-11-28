@@ -4,6 +4,11 @@ on:
   push:
     branches: [dev]
 
+# One deploy at a time; a newer push waits instead of cancelling a deploy halfway through.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
 jobs:
   test:
     uses: ./.github/workflows/test.yml
@@ -77,23 +82,27 @@ jobs:
         run: npm install
 
       - name: Create production .env
+        # dotenv does no escaping: single- and backtick-quoted values are taken literally,
+        # so each value is wrapped in whichever of those quotes it does not contain.
+        # Values that cannot be written safely fail the deploy instead of corrupting .env.
         run: |
-          touch .env
-          echo DB_HOST="$DB_HOST" >> .env
-          echo DB_PW="$DB_PW" >> .env
-          echo DB_USER="$DB_USER" >> .env
-          echo DB_NAME="$DB_NAME" >> .env
-          echo AUTH_SECRET="$AUTH_SECRET" >> .env
-          echo PORT="$PORT" >> .env
-          echo NODE_ENV="$NODE_ENV" >> .env
-          echo SEQUELIZE_SYNC_ALTER="$SEQUELIZE_SYNC_ALTER" >> .env
-          echo GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" >> .env
-          echo SMTP_HOST="$SMTP_HOST" >> .env
-          echo SMTP_PORT="$SMTP_PORT" >> .env
-          echo SMTP_SECURE="$SMTP_SECURE" >> .env
-          echo SMTP_FROM="$SMTP_FROM" >> .env
-          echo SMTP_USER="$SMTP_USER" >> .env
-          echo SMTP_PASSWORD="$SMTP_PASSWORD" >> .env
+          env_line() {
+            local q
+            case "$2" in *\\)
+              echo "::error::$1 ends with a backslash, which dotenv reads as an escaped quote." >&2
+              return 1 ;;
+            esac
+            for q in "'" '`'; do
+              case "$2" in *"$q"*) ;; *) printf '%s=%s%s%s\n' "$1" "$q" "$2" "$q"; return 0 ;; esac
+            done
+            echo "::error::$1 contains both ' and \` and cannot be written to .env safely." >&2
+            return 1
+          }
+          : > .env
+          for key in DB_HOST DB_PW DB_USER DB_NAME AUTH_SECRET PORT NODE_ENV SEQUELIZE_SYNC_ALTER \
+            GOOGLE_CLIENT_ID SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_FROM SMTP_USER SMTP_PASSWORD; do
+            env_line "$key" "${!key}" >> .env
+          done
 
       - name: Bundle deploy folder
         run: npm run bundle
@@ -103,6 +112,8 @@ jobs:
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
           ARGS: "-rltgoDzvO --delete"
+          # Server-side logs and installed packages are not in the bundle; keep --delete away from them.
+          EXCLUDE: "/logs/, /node_modules/"
           SOURCE: backend/deploy/
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
