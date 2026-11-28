@@ -394,16 +394,16 @@ describe("Feature 1 — User Authentication & Authorization", () => {
       await db.session.create({ token: lapsedRow, email: avery.email, expirationDate: new Date(Date.now() - 1000), userId });
 
       const cases = [
-        request(app).get("/vehicle-t6/auth/me"),
-        request(app).get("/vehicle-t6/auth/me").set("Authorization", "Token abc"),
-        me("not-a-jwt"),
-        me(tampered),
-        me(expired),
-        me(unknownSession),
-        me(lapsedRow),
+        () => request(app).get("/vehicle-t6/auth/me"),
+        () => request(app).get("/vehicle-t6/auth/me").set("Authorization", "Token abc"),
+        () => me("not-a-jwt"),
+        () => me(tampered),
+        () => me(expired),
+        () => me(unknownSession),
+        () => me(lapsedRow),
       ];
-      for (const pending of cases) {
-        const response = await pending;
+      for (const attempt of cases) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }
@@ -501,8 +501,13 @@ describe("Feature 1 — User Authentication & Authorization", () => {
   describe("US-1.4 — Sign out", () => {
     it("Sign-out invalidates the current session", async () => {
       const { token, userId } = await signIn();
-      for (const pending of [request(app).post("/vehicle-t6/logout"), logout(expiredToken(userId)), logout("not-a-jwt")]) {
-        const refused = await pending;
+      const attempts = [
+        () => request(app).post("/vehicle-t6/logout"),
+        () => logout(expiredToken(userId)),
+        () => logout("not-a-jwt"),
+      ];
+      for (const attempt of attempts) {
+        const refused = await attempt();
         expect(refused.status).toBe(401);
         expect(refused.body).toEqual({ message: "Unauthorized." });
       }

@@ -105,15 +105,15 @@ describe("Feature 5 — Driver Management", () => {
       const driver = await db.driver.create(jordan);
       const before = await snapshot();
       const attempts = [
-        list(),
-        create(undefined, jordan),
-        update(undefined, driver.id, jordan),
-        remove(undefined, driver.id),
-        options(),
-        auth(request(app).get("/vehicle-t6/drivers"), "not-a-session"),
+        () => list(),
+        () => create(undefined, jordan),
+        () => update(undefined, driver.id, jordan),
+        () => remove(undefined, driver.id),
+        () => options(),
+        () => auth(request(app).get("/vehicle-t6/drivers"), "not-a-session"),
       ];
-      for (const pending of attempts) {
-        const response = await pending;
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }

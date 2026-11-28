@@ -97,14 +97,14 @@ describe("Feature 2 — Area Management", () => {
       const { athleticsId } = await seedAreas();
       const before = await snapshot();
       const attempts = [
-        list(),
-        create(undefined, replacement),
-        update(undefined, athleticsId, replacement),
-        remove(undefined, athleticsId),
-        auth(request(app).get("/vehicle-t6/areas"), "not-a-session"),
+        () => list(),
+        () => create(undefined, replacement),
+        () => update(undefined, athleticsId, replacement),
+        () => remove(undefined, athleticsId),
+        () => auth(request(app).get("/vehicle-t6/areas"), "not-a-session"),
       ];
-      for (const pending of attempts) {
-        const response = await pending;
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }

@@ -297,13 +297,13 @@ describe("Feature 7 — Reservation Requests", () => {
       });
 
       const attempts = [
-        listRequests(),
-        createRequest(undefined, validCatalogBody()),
-        updateRequest(undefined, req1.id, validCatalogBody()),
-        cancelRequest(undefined, req1.id),
+        () => listRequests(),
+        () => createRequest(undefined, validCatalogBody()),
+        () => updateRequest(undefined, req1.id, validCatalogBody()),
+        () => cancelRequest(undefined, req1.id),
       ];
-      for (const pending of attempts) {
-        const response = await pending;
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }

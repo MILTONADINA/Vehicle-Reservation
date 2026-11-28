@@ -134,15 +134,15 @@ describe("Feature 4 — Vehicle Management", () => {
       const vehicle = await db.vehicle.create(chevyExpress(area1));
       const before = await snapshot();
       const attempts = [
-        list(),
-        create(undefined, fordTransit(area1)),
-        update(undefined, vehicle.id, fordTransit(area1)),
-        remove(undefined, vehicle.id),
-        options(),
-        auth(request(app).get("/vehicle-t6/vehicles"), "not-a-session"),
+        () => list(),
+        () => create(undefined, fordTransit(area1)),
+        () => update(undefined, vehicle.id, fordTransit(area1)),
+        () => remove(undefined, vehicle.id),
+        () => options(),
+        () => auth(request(app).get("/vehicle-t6/vehicles"), "not-a-session"),
       ];
-      for (const pending of attempts) {
-        const response = await pending;
+      for (const attempt of attempts) {
+        const response = await attempt();
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ message: "Unauthorized." });
       }
